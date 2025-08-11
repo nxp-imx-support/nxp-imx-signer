@@ -270,7 +270,7 @@ int sign_csf(char *cfgname, char *ofname)
     if (g_debug) {
         strncpy(cst_extra_param, "--verbose", 10);
     }
-
+    strncpy(cst_extra_param, "-b pkcs11", 10);
     /* Find if tool exists and capture path */
     if (!find_cst_tool(&sys_cmd[0])) {
         if (0 > (snprintf(sys_cmd + strlen(sys_cmd), (SYS_CMD_LEN - strlen(sys_cmd)), " %s --i %s --o %s", cst_extra_param, cfgname, ofname))) {
@@ -457,13 +457,13 @@ static int create_csf_file_v1(image_block_t *blocks, int idx, char *ofname)
         else{
             uint8_t Interact_token = 0;
             for (int i = 0; rvalue[i] != '\0' ; i++) {
-                if (strncmp(&rvalue[i], "token", 4)) {
+                if (!strncmp(&rvalue[i], "token", 4)) {
                     Interact_token = 1;
                     break;
                 }
             }
             if(!Interact_token)
-                fprintf(fp_csf_file, "\tFile = \"%s/crts/%s\"\n", g_sig_tool_path, rvalue);
+                fprintf(fp_csf_file, "\tFile = \"%s/crts/%s\"\n", g_sig_data_path, rvalue);
             else
                 fprintf(fp_csf_file, "\tFile = \"%s\"\n", rvalue);
         }
@@ -572,7 +572,7 @@ static int create_csf_file_v1(image_block_t *blocks, int idx, char *ofname)
         else{
             uint8_t Interact_token = 0;
             for (int i = 0; rvalue[i] != '\0' ; i++) {
-                if (strncmp(&rvalue[i], "token", 4)) {
+                if (!strncmp(&rvalue[i], "token", 4)) {
                     Interact_token = 1;
                     break;
                 }
