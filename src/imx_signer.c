@@ -454,8 +454,19 @@ static int create_csf_file_v1(image_block_t *blocks, int idx, char *ofname)
         cfg_parser(fp_cfg, rvalue, RSIZE, "csfk_file");
         if ('\0' == rvalue[0])
             fprintf(fp_csf_file, "\tFile = \"%s/crts/CSF1_1_sha256_2048_65537_v3_usr_crt.pem\"\n", g_sig_tool_path);
-        else
-            fprintf(fp_csf_file, "\tFile = \"%s/crts/%s\"\n", g_sig_tool_path, rvalue);
+        else{
+            uint8_t Interact_token = 0;
+            for (int i = 0; rvalue[i] != '\0' ; i++) {
+                if (strncmp(&rvalue[i], "token", 4)) {
+                    Interact_token = 1;
+                    break;
+                }
+            }
+            if(!Interact_token)
+                fprintf(fp_csf_file, "\tFile = \"%s/crts/%s\"\n", g_sig_tool_path, rvalue);
+            else
+                fprintf(fp_csf_file, "\tFile = \"%s\"\n", rvalue);
+        }
     }
 
     fprintf(fp_csf_file, "[Authenticate CSF]\n");
@@ -558,8 +569,19 @@ static int create_csf_file_v1(image_block_t *blocks, int idx, char *ofname)
         cfg_parser(fp_cfg, rvalue, RSIZE, "img_file");
         if ('\0' == rvalue[0])
             fprintf(fp_csf_file, "\tFile = \"%s/crts/IMG1_1_sha256_2048_65537_v3_usr_crt.pem\"\n", g_sig_tool_path);
-        else
-            fprintf(fp_csf_file, "\tFile = \"%s/crts/%s\"\n", g_sig_tool_path, rvalue);
+        else{
+            uint8_t Interact_token = 0;
+            for (int i = 0; rvalue[i] != '\0' ; i++) {
+                if (strncmp(&rvalue[i], "token", 4)) {
+                    Interact_token = 1;
+                    break;
+                }
+            }
+            if(!Interact_token)
+                fprintf(fp_csf_file, "\tFile = \"%s/crts/%s\"\n", g_sig_data_path, rvalue);
+            else
+                fprintf(fp_csf_file, "\tFile = \"%s\"\n", rvalue);
+        }
     }
 
     /* Authenticate Data */
@@ -664,7 +686,7 @@ static int create_csf_file_v3(char *csf_filename, char *ifname, csf_params_t *cs
     if ('\0' == rvalue[0])
         fprintf(fp_csf_file, "\tSource = \"%s/crts/SRK1_sha256_prime256v1_v3_ca_crt.pem\"\n", g_sig_tool_path);
     else
-        fprintf(fp_csf_file, "\tSource = \"%s/crts/%s\"\n", g_sig_tool_path, rvalue);
+        fprintf(fp_csf_file, "\tSource = \"%s/crts/%s\"\n", g_sig_data_path, rvalue);
 
     cfg_parser(fp_cfg, rvalue, RSIZE, "srk_source_index");
     if ('\0' == rvalue[0])
