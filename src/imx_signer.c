@@ -18,6 +18,10 @@ unsigned long g_ivt_off_cve = 0x0;
 unsigned long g_ivt_search_step = 0;
 int g_last_img_idx = 0;
 
+//const char *g_path_pkcs11 = "PKCS11_MODULE_PATH";
+const char *g_user_pin = "USR_PIN";
+const char *g_token = "CST-HSM-DEMO";
+
 typedef struct {
     int cntr_num;
     uint32_t cntr_offset;
@@ -265,15 +269,16 @@ int sign_csf(char *cfgname, char *ofname)
 
     char sys_cmd[SYS_CMD_LEN] = {0};
     char cst_extra_param[10] = {0};
+    char cst_extra_token[10] = {0};
 
     /* Add debug info to the tool output */
     if (g_debug) {
         strncpy(cst_extra_param, "--verbose", 10);
     }
-    strncpy(cst_extra_param, "-b pkcs11", 10);
+    strncpy(cst_extra_token, "-b pkcs11", 10);
     /* Find if tool exists and capture path */
     if (!find_cst_tool(&sys_cmd[0])) {
-        if (0 > (snprintf(sys_cmd + strlen(sys_cmd), (SYS_CMD_LEN - strlen(sys_cmd)), " %s --i %s --o %s", cst_extra_param, cfgname, ofname))) {
+        if (0 > (snprintf(sys_cmd + strlen(sys_cmd), (SYS_CMD_LEN - strlen(sys_cmd)), " %s %s --i %s --o %s", cst_extra_param, cst_extra_token, cfgname, ofname))) {
             fprintf(stderr, "ERROR: System command build unsuccessful. Exiting.\n");
             return -E_FAILURE;
         }
@@ -456,16 +461,56 @@ static int create_csf_file_v1(image_block_t *blocks, int idx, char *ofname)
             fprintf(fp_csf_file, "\tFile = \"%s/crts/CSF1_1_sha256_2048_65537_v3_usr_crt.pem\"\n", g_sig_tool_path);
         else{
             uint8_t Interact_token = 0;
-            for (int i = 0; rvalue[i] != '\0' ; i++) {
-                if (!strncmp(&rvalue[i], "token", 4)) {
-                    Interact_token = 1;
+            for (int i = 0; rvalue[i] != '\0' ; i++) 
+            {
+                if (!strncmp(&rvalue[i], "pkcs11", 6)) 
+                {
+                    Interact_token |= 0x01;
+                    printf("PKCS11 Found %d.\n",i);
+                    for (int i = 0; rvalue[i] != '\0' ; i++) 
+                    {
+                        if (!strncmp(&rvalue[i], "token", 5)) 
+                        {
+                            printf("token word Found.\n");
+                            Interact_token |= 0x02;
+                            break;
+                        }
+                    }
                     break;
                 }
             }
             if(!Interact_token)
+            {
+                printf("Interact_token NOT enabled.\n");
                 fprintf(fp_csf_file, "\tFile = \"%s/crts/%s\"\n", g_sig_data_path, rvalue);
-            else
-                fprintf(fp_csf_file, "\tFile = \"%s\"\n", rvalue);
+            }
+            else{
+                if(Interact_token && 0x02)
+                {    
+                    printf("Token word defined.\n");
+                    fprintf(fp_csf_file, "\tFile = \"%s\"\n", rvalue);
+                }
+                else {
+                    fprintf(fp_csf_file, "\tFile = ");
+                    char *tokenvalue = getenv(g_token);
+                    if (tokenvalue) 
+                    {
+                        printf("Environment variable %s is defined with value: %s\n", g_token, tokenvalue);
+                        fprintf(fp_csf_file, "pkcs11:token=%s;",tokenvalue);
+                    }
+                    else{
+                        printf("Token Enviroment Variable is not defined.\n");
+                    }
+
+                    char *pinValue = getenv(g_user_pin);
+                    if (pinValue) {
+                        printf("Environment variable %s is defined with value: %s\n", g_user_pin, pinValue);
+                        fprintf(fp_csf_file, "pin-value=%s",pinValue);
+                    } else 
+                        printf("Pin User is not defined.\n");
+                    fprintf(fp_csf_file, "\tFile = ");
+                }
+            }        
         }
     }
 
