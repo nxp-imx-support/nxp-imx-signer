@@ -466,12 +466,12 @@ static int create_csf_file_v1(image_block_t *blocks, int idx, char *ofname)
                 if (!strncmp(&rvalue[i], "pkcs11", 6)) 
                 {
                     Interact_token |= 0x01;
-                    printf("PKCS11 Found %d.\n",i);
+                    DEBUG("PKCS11 Found %d.\n",i);
                     for (int i = 0; rvalue[i] != '\0' ; i++) 
                     {
                         if (!strncmp(&rvalue[i], "token", 5)) 
                         {
-                            printf("token word Found.\n");
+                            DEBUG("Token word Found.\n");
                             Interact_token |= 0x02;
                             break;
                         }
@@ -481,36 +481,47 @@ static int create_csf_file_v1(image_block_t *blocks, int idx, char *ofname)
             }
             if(!Interact_token)
             {
-                printf("Interact_token NOT enabled.\n");
+                DEBUG("Interact_token NOT enabled.\n");
                 fprintf(fp_csf_file, "\tFile = \"%s/crts/%s\"\n", g_sig_data_path, rvalue);
             }
-            else{
-                if(Interact_token && 0x02)
-                {    
-                    printf("Token word defined.\n");
-                    fprintf(fp_csf_file, "\tFile = \"%s\"\n", rvalue);
+            else if(Interact_token & 0x02)
+            {    
+                printf("Token word defined.\n");
+                fprintf(fp_csf_file, "\tFile = \"%s\"\n", rvalue);
+            }
+            else if(Interact_token & 0x01)
+            {   
+                fprintf(fp_csf_file, "\tFile = \"");
+                for (int i = 0; rvalue[i] != '\0' ; i++) 
+                {
+                        if (!strncmp(&rvalue[i], "object", 5)) 
+                        {
+                            printf("found it in %d \n",i);
+                            break;
+                        }
                 }
-                else {
-                    fprintf(fp_csf_file, "\tFile = ");
-                    char *tokenvalue = getenv(g_token);
-                    if (tokenvalue) 
-                    {
-                        printf("Environment variable %s is defined with value: %s\n", g_token, tokenvalue);
-                        fprintf(fp_csf_file, "pkcs11:token=%s;",tokenvalue);
-                    }
-                    else{
-                        printf("Token Enviroment Variable is not defined.\n");
-                    }
+                    
+                printf("Token word defined from obkect %s %ld.\n",rvalue,sizeof(rvalue));
+                char *tokenvalue = getenv(g_token);
+                if (!tokenvalue) 
+                {
+                    printf("Environment variable %s is defined with value: %s\n", g_token, tokenvalue);
+                    //fprintf(fp_csf_file, "pkcs11:token=%s;",tokenvalue);
+                    fprintf(fp_csf_file, "pkcs11:token=CST-HSM-DEMO;%s;",&rvalue[7]);
+                }
+                else
+                {
+                    printf("Token Enviroment Variable is not defined.\n");
+                }
 
-                    char *pinValue = getenv(g_user_pin);
-                    if (pinValue) {
-                        printf("Environment variable %s is defined with value: %s\n", g_user_pin, pinValue);
-                        fprintf(fp_csf_file, "pin-value=%s",pinValue);
-                    } else 
-                        printf("Pin User is not defined.\n");
-                    fprintf(fp_csf_file, "\tFile = ");
-                }
-            }        
+                char *pinValue = getenv(g_user_pin);
+                if (pinValue) {
+                    printf("Environment variable %s is defined with value: %s\n", g_user_pin, pinValue);
+                    fprintf(fp_csf_file, "pin-value=%s",pinValue);
+                } else 
+                    printf("Pin User is not defined.\n");
+                fprintf(fp_csf_file, "\"\n");   
+            }  
         }
     }
 
