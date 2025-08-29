@@ -1,0 +1,21 @@
+#Header
+header_version=4.3
+header_eng=ANY
+header_eng_config=0
+#Install SRK
+srktable_file=SRK_1_2_3_4_table_8mini.bin
+srk_source_index=0
+#Install NOCAK
+nocak_file=
+#Install CSFK
+csfk_file=pkcs11;object=CSF1_1_sha256_2048_65537_v3_usr;type=cert;pin-value=$USR_PIN
+#Unlock
+unlock_engine=
+unlock_features=
+unlock_uid=
+#Install Key
+img_verification_index=0
+img_target_index=2
+img_file=pkcs11:token=CST-HSM-DEMO;object=IMG1_1_sha256_2048_65537_v3_usr;type=cert;pin-value=123456
+#Authenticate Data
+auth_verification_index=2

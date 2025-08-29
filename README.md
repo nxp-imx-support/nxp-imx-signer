@@ -65,15 +65,19 @@ YAML config file filled with appropriate values based on the setup.
 To help start the signing process, sample CSF/YAML configuration files have 
 been provided as part of this package.
 
-CFG file supporting HAB images: *csf_hab4.cfg.sample*
-CFG file supporting AHAB images: *csf_ahab.cfg.sample*, *spsdk_ahab.cfg.sample*
+- CFG file supporting HAB images: *csf_hab4.cfg.sample* or *csf_hab4_pkcs11.cfg.sample* for PKCS11 Suport
+- CFG file supporting AHAB images: *csf_ahab.cfg.sample*, *spsdk_ahab.cfg.sample*
+
+**_NOTE_**: Be sure the PKCS#11 support is enabled and Token and USR_PIN environmental variables are defined.
 
 Invoke the *imx_signer* executable as follows (example):
-CST Example: `SIG_TOOL_PATH=<cst> SIG_DATA_PATH=<keys/crts folder> ./imx_signer -i flash.bin -c csf.cfg`
-SPSDK Example: `SIG_TOOL_PATH=<spsdk> SIG_DATA_PATH=<keys/crts folder> ./imx_signer -i flash.bin -c spsdk.cfg`
-
+```sh
+# CST Example: 
+$ SIG_TOOL_PATH=<cst> SIG_DATA_PATH=<keys/crts folder> ./imx_signer -i flash.bin -c csf.cfg
+# SPSDK Example:
+$ SIG_TOOL_PATH=<spsdk> SIG_DATA_PATH=<keys/crts folder> ./imx_signer -i flash.bin -c spsdk.cfg
+```
 ---
-
 ### Results
 
 This tool generates final signed binary as "**signed-\<input_filename\>**". In 
