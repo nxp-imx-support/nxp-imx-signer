@@ -265,8 +265,7 @@ int sign_csf(char *cfgname, char *ofname)
     ASSERT(ofname, -1);
 
     char sys_cmd[SYS_CMD_LEN] = {0};
-    char cst_extra_param[10] = {0};
-    char cst_extra_token[10] = {0};
+    char cst_extra_param[20] = {0};
 
     /* Add debug info to the tool output */
     if (g_debug) {
@@ -274,11 +273,11 @@ int sign_csf(char *cfgname, char *ofname)
     }
     /* Add -b pcks11 command*/
     if(g_pkcs11_token) {
-        strncpy(cst_extra_token, "-b pkcs11", 10);
+        strncpy(cst_extra_param, "-b pkcs11", 10);
     }
     /* Find if tool exists and capture path */
     if (!find_cst_tool(&sys_cmd[0])) {
-        if (0 > (snprintf(sys_cmd + strlen(sys_cmd), (SYS_CMD_LEN - strlen(sys_cmd)), " %s %s --i %s --o %s", cst_extra_param, cst_extra_token, cfgname, ofname))) {
+        if (0 > (snprintf(sys_cmd + strlen(sys_cmd), (SYS_CMD_LEN - strlen(sys_cmd)), " %s --i %s --o %s", cst_extra_param, cfgname, ofname))) {
             fprintf(stderr, "ERROR: System command build unsuccessful. Exiting.\n");
             return -E_FAILURE;
         }
@@ -459,7 +458,8 @@ static int create_csf_file_v1(image_block_t *blocks, int idx, char *ofname)
         cfg_parser(fp_cfg, rvalue, RSIZE, "csfk_file");
         if ('\0' == rvalue[0])
             fprintf(fp_csf_file, "\tFile = \"%s/crts/CSF1_1_sha256_2048_65537_v3_usr_crt.pem\"\n", g_sig_tool_path);
-        else{
+        else {
+            /* Search PCKS11 String*/
             g_pkcs11_token = 0;
             for (int i = 0; rvalue[i] != '\0' ; i++) {
                 if (!strncmp(&rvalue[i], "pkcs11", 6)) {
@@ -470,33 +470,30 @@ static int create_csf_file_v1(image_block_t *blocks, int idx, char *ofname)
             }
 
             fprintf(fp_csf_file, "\tFile = ");
-            if(!g_pkcs11_token)
+            /* File Based Signing */
+            if (!g_pkcs11_token)
                 fprintf(fp_csf_file, "\"%s/crts/%s", g_sig_data_path, rvalue);
-            else if(g_pkcs11_token & PCKS11_EN)
-            {
-                uint8_t counter = 0;
+            /* PKCS11 Based Signing */
+            else if (g_pkcs11_token & PCKS11_EN)
+            {   
+                /* Search object, token, pin value and type Strings*/
+                for (int i = 0; rvalue[i] != '\0' ; i++) {
+                    if (!strncmp(&rvalue[i], "token", 5))
+                        g_pkcs11_token |= TOKEN_EN;
+                    if (!strncmp(&rvalue[i], "pin-value", 9))
+                        g_pkcs11_token |= USRPIN;
+                    if (!strncmp(&rvalue[i], "type", 4))
+                        g_pkcs11_token |= TYPE_CERT;
+                }
+                uint8_t counter = 6;
                 for (counter = 0; rvalue[counter] != '\0' ; counter++) {
                     if (!strncmp(&rvalue[counter], "object", 6))
                         break;
                 }
-                for (int i = 0; rvalue[i] != '\0' ; i++) {
-                        if (!strncmp(&rvalue[i], "token", 5)) {
-                            g_pkcs11_token |= TOKEN_EN;
-                            break;
-                        }
-                }
-                char *pinValue = getenv(g_user_pin);
-                if (pinValue) {
-                    for (int i = 0; rvalue[i] != '\0' ; i++) {
-                        if (!strncmp(&rvalue[i], "pin-value", 9)) {
-                            g_pkcs11_token |= USRPIN;
-                            break;
-                        }
-                    }
-                }
-                if((g_pkcs11_token & TOKEN_EN) && (g_pkcs11_token & USRPIN))
+                 /* Prepare Token and USR PIN Parameters */
+                if ((g_pkcs11_token & TOKEN_EN) && (g_pkcs11_token & USRPIN) && (g_pkcs11_token & TYPE_CERT))
                      fprintf(fp_csf_file, "\"%s", rvalue);
-                else if(g_pkcs11_token & TOKEN_EN )
+                else if ( g_pkcs11_token & TOKEN_EN )
                     fprintf(fp_csf_file, "\"%s", rvalue);
                 else {
                     char *tokenvalue = getenv(g_token);
@@ -505,9 +502,14 @@ static int create_csf_file_v1(image_block_t *blocks, int idx, char *ofname)
                         fprintf(fp_csf_file, "pkcs11:token=%s;%s;",tokenvalue,&rvalue[counter]);
                     }
                 }
-                if(!(g_pkcs11_token & USRPIN)){
-                    DEBUG("Environment variable %s is defined with value: %s\n", g_user_pin, pinValue);
-                    fprintf(fp_csf_file, ";pin-value=%s",pinValue);
+                if (!(g_pkcs11_token & TYPE_CERT))
+                    fprintf(fp_csf_file, ";type=cert");
+                if (!(g_pkcs11_token & USRPIN)) {
+                    char *pinValue = getenv(g_user_pin);
+                    if (pinValue!=NULL) {
+                        DEBUG("Environment variable %s is defined with value: %s\n", g_user_pin, pinValue);
+                        fprintf(fp_csf_file, ";pin-value=%s",pinValue);
+                    }
                 }
             }
             fprintf(fp_csf_file, "\"\n");
@@ -614,7 +616,8 @@ static int create_csf_file_v1(image_block_t *blocks, int idx, char *ofname)
         cfg_parser(fp_cfg, rvalue, RSIZE, "img_file");
         if ('\0' == rvalue[0])
             fprintf(fp_csf_file, "\tFile = \"%s/crts/IMG1_1_sha256_2048_65537_v3_usr_crt.pem\"\n", g_sig_tool_path);
-        else{
+        else {
+            /* Search PCKS11 String*/
             g_pkcs11_token = 0;
             for (int i = 0; rvalue[i] != '\0' ; i++) {
                 if (!strncmp(&rvalue[i], "pkcs11", 6)) {
@@ -622,47 +625,49 @@ static int create_csf_file_v1(image_block_t *blocks, int idx, char *ofname)
                     break;
                 }
             }
-
+            /* File Based Signing */
             fprintf(fp_csf_file, "\tFile = ");
-            if(!g_pkcs11_token)
+            if (!g_pkcs11_token)
                 fprintf(fp_csf_file, "\"%s/crts/%s", g_sig_data_path, rvalue);
-            else if(g_pkcs11_token & PCKS11_EN)
+            /* PKCS11 Based Signing */
+            else if (g_pkcs11_token & PCKS11_EN)
             {   
-                uint8_t counter = 0;
-                for (counter = 0; rvalue[counter] != '\0' ; counter++) {
+                /* Search object, token, pin value and type Strings*/
+                for (int i = 6; rvalue[i] != '\0' ; i++) {
+                    if (!strncmp(&rvalue[i], "token", 5))
+                        g_pkcs11_token |= TOKEN_EN;
+                    if (!strncmp(&rvalue[i], "pin-value", 9))
+                        g_pkcs11_token |= USRPIN;
+                    if (!strncmp(&rvalue[i], "type", 4))
+                        g_pkcs11_token |= TYPE_CERT;
+                }
+                uint8_t counter = 6;
+                for (counter = 6; rvalue[counter] != '\0' ; counter++) {
                     if (!strncmp(&rvalue[counter], "object", 6))
                         break;
                 }
-                for (int i = 0; rvalue[i] != '\0' ; i++) {
-                        if (!strncmp(&rvalue[i], "token", 5)) {
-                            g_pkcs11_token |= TOKEN_EN;
-                            break;
-                        }
-                }
-                char *pinValue = getenv(g_user_pin);
-                if (pinValue) {
-                    for (int i = 0; rvalue[i] != '\0' ; i++) {
-                        if (!strncmp(&rvalue[i], "pin-value", 9)) {
-                            g_pkcs11_token |= USRPIN;
-                            break;
-                        }
-                    }
-                }
-                if((g_pkcs11_token & TOKEN_EN) && (g_pkcs11_token & USRPIN))
+                /* Prepare Token and USR PIN Parameters */
+                if ((g_pkcs11_token & TOKEN_EN) && (g_pkcs11_token & USRPIN) && (g_pkcs11_token & TYPE_CERT))
                      fprintf(fp_csf_file, "\"%s", rvalue);
-                else if(g_pkcs11_token & TOKEN_EN )
+                else if (g_pkcs11_token & TOKEN_EN )
                     fprintf(fp_csf_file, "\"%s", rvalue);
                 else {
-                     char *tokenvalue = getenv(g_token);
+                    char *tokenvalue = getenv(g_token);
                     if (!tokenvalue) {
                         DEBUG("Environment variable %s is defined with value: %s\n", g_token, tokenvalue);
                         fprintf(fp_csf_file, "pkcs11:token=%s;%s;",tokenvalue,&rvalue[counter]);
                     }
                 }
-                if(!(g_pkcs11_token & USRPIN)){
-                    DEBUG("Environment variable %s is defined with value: %s\n", g_user_pin, pinValue);
-                    fprintf(fp_csf_file, ";pin-value=%s",pinValue);
+                if (!(g_pkcs11_token & TYPE_CERT))
+                    fprintf(fp_csf_file, ";type=cert");
+                if (!(g_pkcs11_token & USRPIN)) {
+                    char *pinValue = getenv(g_user_pin);
+                    if (pinValue!=NULL) {
+                        DEBUG("IMG Environment variable %s is defined with value: %s\n", g_user_pin, pinValue);
+                        fprintf(fp_csf_file, ";pin-value=%s",pinValue);
+                    }
                 }
+
             }
             fprintf(fp_csf_file, "\"\n");
         }

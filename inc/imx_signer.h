@@ -106,6 +106,7 @@ typedef enum PCKS_TOKEN {
     PCKS11_EN = 1,
     TOKEN_EN,
     USRPIN = 4,
+    TYPE_CERT = 8,
 } pkcs11token_type_t;
 
 #define E_OK 0
