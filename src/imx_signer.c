@@ -474,8 +474,7 @@ static int create_csf_file_v1(image_block_t *blocks, int idx, char *ofname)
             if (!g_pkcs11_token)
                 fprintf(fp_csf_file, "\"%s/crts/%s", g_sig_data_path, rvalue);
             /* PKCS11 Based Signing */
-            else if (g_pkcs11_token & PCKS11_EN)
-            {   
+            else if (g_pkcs11_token & PCKS11_EN) {   
                 /* Search object, token, pin value and type Strings*/
                 for (int i = 0; rvalue[i] != '\0' ; i++) {
                     if (!strncmp(&rvalue[i], "token", 5))
@@ -630,8 +629,7 @@ static int create_csf_file_v1(image_block_t *blocks, int idx, char *ofname)
             if (!g_pkcs11_token)
                 fprintf(fp_csf_file, "\"%s/crts/%s", g_sig_data_path, rvalue);
             /* PKCS11 Based Signing */
-            else if (g_pkcs11_token & PCKS11_EN)
-            {   
+            else if (g_pkcs11_token & PCKS11_EN) {   
                 /* Search object, token, pin value and type Strings*/
                 for (int i = 6; rvalue[i] != '\0' ; i++) {
                     if (!strncmp(&rvalue[i], "token", 5))

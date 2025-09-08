@@ -65,7 +65,7 @@ YAML config file filled with appropriate values based on the setup.
 To help start the signing process, sample CSF/YAML configuration files have 
 been provided as part of this package.
 
-- CFG file supporting HAB images: *csf_hab4.cfg.sample* or *csf_hab4_pkcs11.cfg.sample* for PKCS11 Suport
+- CFG file supporting HAB images: *csf_hab4.cfg.sample* or *csf_hab4_pkcs11.cfg.sample* for PKCS11 Support
 - CFG file supporting AHAB images: *csf_ahab.cfg.sample*, *spsdk_ahab.cfg.sample*
 
 **_NOTE_**: Be sure the PKCS#11 support is enabled and Token and USR_PIN environmental variables are defined.

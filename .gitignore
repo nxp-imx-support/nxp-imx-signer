@@ -1,0 +1,7 @@
+# Compiled object files
+src/cst_signer
+*.bin
+*.o
+*.obj
+*.out
+
