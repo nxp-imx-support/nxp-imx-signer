@@ -20,7 +20,7 @@
         Command line arguments
 ************************/
 /* Valid short command line option letters. */
-const char* const short_opt = "hfdi:o:c:";
+const char* const short_opt = "hfdpi:o:c:";
 
 /* Valid long command line options. */
 const struct option long_opt[] =
@@ -30,6 +30,7 @@ const struct option long_opt[] =
     {"offset", required_argument,  0, 'o'},
     {"debug", no_argument,  0, 'd'},
     {"fdt-debug", no_argument,  0, 'f'},
+    {"pkcs11", no_argument, 0, 'p'},
     {"help", no_argument, 0, 'h'},
     {NULL, 0, NULL, 0}
 };
@@ -186,6 +187,7 @@ typedef struct {
 
 /*   Global Variables   */
 static bool g_debug = 0;
+static bool g_pkcs11_backend = 0;
 static char *g_cfgfilename = NULL;
 extern uint32_t g_image_offset;
 static char *g_sig_tool_path = NULL;

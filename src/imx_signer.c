@@ -273,7 +273,8 @@ int sign_csf(char *cfgname, char *ofname)
 
     /* Find if tool exists and capture path */
     if (!find_cst_tool(&sys_cmd[0])) {
-        if (0 > (snprintf(sys_cmd + strlen(sys_cmd), (SYS_CMD_LEN - strlen(sys_cmd)), " %s --i %s --o %s", cst_extra_param, cfgname, ofname))) {
+        const char *pkcs11_backend_param = g_pkcs11_backend ? "-b pkcs11" : "";
+        if (0 > (snprintf(sys_cmd + strlen(sys_cmd), (SYS_CMD_LEN - strlen(sys_cmd)), " %s --i %s --o %s %s", cst_extra_param, cfgname, ofname, pkcs11_backend_param))) {
             fprintf(stderr, "ERROR: System command build unsuccessful. Exiting.\n");
             return -E_FAILURE;
         }
@@ -452,7 +453,9 @@ static int create_csf_file_v1(image_block_t *blocks, int idx, char *ofname)
         /* Install CSFK */
         fprintf(fp_csf_file, "[Install CSFK]\n");
         cfg_parser(fp_cfg, rvalue, RSIZE, "csfk_file");
-        if ('\0' == rvalue[0])
+        if (g_pkcs11_backend)
+            fprintf(fp_csf_file, "\tFile = \"%s\"\n", rvalue);
+        else if ('\0' == rvalue[0])
             fprintf(fp_csf_file, "\tFile = \"%s/crts/CSF1_1_sha256_2048_65537_v3_usr_crt.pem\"\n", g_sig_tool_path);
         else
             fprintf(fp_csf_file, "\tFile = \"%s/crts/%s\"\n", g_sig_tool_path, rvalue);
@@ -556,7 +559,9 @@ static int create_csf_file_v1(image_block_t *blocks, int idx, char *ofname)
             fprintf(fp_csf_file, "\tTarget index = %s\n", rvalue);
 
         cfg_parser(fp_cfg, rvalue, RSIZE, "img_file");
-        if ('\0' == rvalue[0])
+        if (g_pkcs11_backend)
+            fprintf(fp_csf_file, "\tFile = \"%s\"\n", rvalue);
+        else if ('\0' == rvalue[0])
             fprintf(fp_csf_file, "\tFile = \"%s/crts/IMG1_1_sha256_2048_65537_v3_usr_crt.pem\"\n", g_sig_tool_path);
         else
             fprintf(fp_csf_file, "\tFile = \"%s/crts/%s\"\n", g_sig_tool_path, rvalue);
@@ -1944,6 +1949,10 @@ int main(int argc, char **argv)
             /* Enable debug FDT */
             case 'f':
                 g_fdt_debug = 1;
+                break;
+            /* Enable PKCS#11 backend */
+            case 'p':
+                g_pkcs11_backend = 1;
                 break;
             /* Display usage */
             case 'h':
