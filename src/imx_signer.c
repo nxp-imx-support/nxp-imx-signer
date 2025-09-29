@@ -17,7 +17,7 @@ uint32_t g_image_offset = 0;
 unsigned long g_ivt_off_cve = 0x0;
 unsigned long g_ivt_search_step = 0;
 int g_last_img_idx = 0;
-uint8_t g_pkcs11_token = 0;
+int g_pkcs11_token = 0;
 
 typedef struct {
     int cntr_num;
@@ -361,6 +361,68 @@ err:
     FCLOSE(fp_ofname);
     return -E_FAILURE;
 }
+/*
+ * @brief       Extract config value from a string with environment variable handling
+ *
+ * @param[in]   rvalue        : Configuration value string
+ *
+ * @retval      config_value  : Extracted config value with env variable resolved
+ */
+static char *extract_config_value(const char *rvalue)
+{
+    char *search_equal = strchr(rvalue, '=');
+    char *config_value = malloc(100);
+    int skip = 0;
+
+    if (search_equal == NULL || config_value == NULL ) {
+        DEBUG("Search Token Error\n");
+        DEBUG("Memory allocation failed\n");
+        return NULL;
+    }
+
+    strcpy(&config_value[0],&search_equal[1]);
+    strtok(config_value, ";");
+    if (config_value == NULL) {
+        FREE(config_value);
+        return NULL;
+    }
+
+    if(strchr(config_value,'$')!=NULL) {
+        char *source = &config_value[0];
+        if (*source == '$') {
+            skip++;
+            if (source[1] == '{') {
+                skip++;
+            }
+        }
+        strcpy(&config_value[0], source + skip);
+        strtok(&config_value[0], "}");
+    }
+    return config_value;
+}
+/*
+ * @brief       Detect and validate PKCS11 Config Param
+ *
+ * @param[in]   config_value : String with the PKCS11 configuration parameters
+ *
+ * @retval      flags        : PKCS11 configuration validation flags
+ */
+static int detect_pkcs11_config(const char *config_value) {
+    if (!config_value)
+        return 0;
+    int flags = 0;
+    if (strstr(config_value, "pkcs11"))
+        flags |= PCKS11_EN;
+    if (strstr(config_value, "token="))
+        flags |= TOKEN_EN;
+    if (strstr(config_value, "object="))
+            flags |= OBJ_TYPE;
+    if (strstr(config_value, "type=cert"))
+        flags |= TYPE_CERT;
+    if (strstr(config_value, "pin-value"))
+        flags |= USRPIN;
+    return flags;
+}
 
 /*
  * @brief       Create CSF source file for IVT type v1
@@ -461,12 +523,9 @@ static int create_csf_file_v1(image_block_t *blocks, int idx, char *ofname)
         else {
             /* Search PCKS11 String*/
             g_pkcs11_token = 0;
-            for (int i = 0; rvalue[i] != '\0' ; i++) {
-                if (!strncmp(&rvalue[i], "pkcs11", 6)) {
-                    g_pkcs11_token |= PCKS11_EN;
-                    DEBUG("PKCS11 Signer Selected.\n");
-                    break;
-                }
+            if (strstr(&rvalue[0], "pkcs11")) {
+                g_pkcs11_token |= PCKS11_EN;
+                DEBUG("PKCS11 Signer Selected.\n");
             }
 
             fprintf(fp_csf_file, "\tFile = ");
@@ -474,41 +533,42 @@ static int create_csf_file_v1(image_block_t *blocks, int idx, char *ofname)
             if (!g_pkcs11_token)
                 fprintf(fp_csf_file, "\"%s/crts/%s", g_sig_data_path, rvalue);
             /* PKCS11 Based Signing */
-            else if (g_pkcs11_token & PCKS11_EN) {   
-                /* Search object, token, pin value and type Strings*/
-                for (int i = 0; rvalue[i] != '\0' ; i++) {
-                    if (!strncmp(&rvalue[i], "token", 5))
-                        g_pkcs11_token |= TOKEN_EN;
-                    if (!strncmp(&rvalue[i], "pin-value", 9))
-                        g_pkcs11_token |= USRPIN;
-                    if (!strncmp(&rvalue[i], "type", 4))
-                        g_pkcs11_token |= TYPE_CERT;
-                }
-                uint8_t counter = 6;
-                for (counter = 0; rvalue[counter] != '\0' ; counter++) {
-                    if (!strncmp(&rvalue[counter], "object", 6))
-                        break;
-                }
+            else {
+                g_pkcs11_token |= detect_pkcs11_config(&rvalue[6]);
                  /* Prepare Token and USR PIN Parameters */
-                if ((g_pkcs11_token & TOKEN_EN) && (g_pkcs11_token & USRPIN) && (g_pkcs11_token & TYPE_CERT))
-                     fprintf(fp_csf_file, "\"%s", rvalue);
-                else if ( g_pkcs11_token & TOKEN_EN )
-                    fprintf(fp_csf_file, "\"%s", rvalue);
-                else {
-                    char *tokenvalue = getenv(g_token);
-                    if (!tokenvalue) {
-                        DEBUG("Environment variable %s is defined with value: %s\n", g_token, tokenvalue);
-                        fprintf(fp_csf_file, "pkcs11:token=%s;%s;",tokenvalue,&rvalue[counter]);
-                    }
-                }
-                if (!(g_pkcs11_token & TYPE_CERT))
-                    fprintf(fp_csf_file, ";type=cert");
-                if (!(g_pkcs11_token & USRPIN)) {
-                    char *pinValue = getenv(g_user_pin);
-                    if (pinValue!=NULL) {
-                        DEBUG("Environment variable %s is defined with value: %s\n", g_user_pin, pinValue);
-                        fprintf(fp_csf_file, ";pin-value=%s",pinValue);
-                    }
+                if ( g_pkcs11_token == COMPLETE_CONF) {
+                    char *env_result = extract_config_value(rvalue);
+                    if (env_result != NULL) {
+                        char *pkcs11_token = getenv(&env_result[0]);
+                        if (pkcs11_token != NULL){
+                            DEBUG("Environment variable CST-HSM-DEMO is defined with value: %s\n", pkcs11_token);
+                            fprintf(fp_csf_file, "\"pkcs11:token=%s;",pkcs11_token);
+                        }
+                        else
+                            fprintf(fp_csf_file, "\"pkcs11:token=%s;",env_result);
+                    } else
+                        return -E_FAILURE;
+                    FREE(env_result);
+
+                    // Looking for object config value
+                    char *config_object = extract_config_value(strchr(rvalue, ';'));
+                    fprintf(fp_csf_file, "object=%s;",config_object);
+                    FREE(config_object);
+
+                    // Adding Type = Cert
+                    fprintf(fp_csf_file, "type=cert;");
+
+                    // Looking for USR_PIN environment variable
+                    char *config_pin = extract_config_value(strrchr(rvalue,';'));
+                    char *pkcs11_pin = getenv(config_pin);
+                    if (pkcs11_pin != NULL)
+                        fprintf(fp_csf_file, "pin-value=%s",pkcs11_pin);
+                    else
+                        fprintf(fp_csf_file, "pin-value=%s",config_pin);
+                    FREE(config_pin);
+                } else {
+                    fprintf(stderr, "ERROR: Invalid PKCS11 configuration\n");
+                    return -E_FAILURE;
                 }
             }
             fprintf(fp_csf_file, "\"\n");
@@ -629,43 +689,42 @@ static int create_csf_file_v1(image_block_t *blocks, int idx, char *ofname)
             if (!g_pkcs11_token)
                 fprintf(fp_csf_file, "\"%s/crts/%s", g_sig_data_path, rvalue);
             /* PKCS11 Based Signing */
-            else if (g_pkcs11_token & PCKS11_EN) {   
-                /* Search object, token, pin value and type Strings*/
-                for (int i = 6; rvalue[i] != '\0' ; i++) {
-                    if (!strncmp(&rvalue[i], "token", 5))
-                        g_pkcs11_token |= TOKEN_EN;
-                    if (!strncmp(&rvalue[i], "pin-value", 9))
-                        g_pkcs11_token |= USRPIN;
-                    if (!strncmp(&rvalue[i], "type", 4))
-                        g_pkcs11_token |= TYPE_CERT;
-                }
-                uint8_t counter = 6;
-                for (counter = 6; rvalue[counter] != '\0' ; counter++) {
-                    if (!strncmp(&rvalue[counter], "object", 6))
-                        break;
-                }
-                /* Prepare Token and USR PIN Parameters */
-                if ((g_pkcs11_token & TOKEN_EN) && (g_pkcs11_token & USRPIN) && (g_pkcs11_token & TYPE_CERT))
-                     fprintf(fp_csf_file, "\"%s", rvalue);
-                else if (g_pkcs11_token & TOKEN_EN )
-                    fprintf(fp_csf_file, "\"%s", rvalue);
-                else {
-                    char *tokenvalue = getenv(g_token);
-                    if (!tokenvalue) {
-                        DEBUG("Environment variable %s is defined with value: %s\n", g_token, tokenvalue);
-                        fprintf(fp_csf_file, "pkcs11:token=%s;%s;",tokenvalue,&rvalue[counter]);
-                    }
-                }
-                if (!(g_pkcs11_token & TYPE_CERT))
-                    fprintf(fp_csf_file, ";type=cert");
-                if (!(g_pkcs11_token & USRPIN)) {
-                    char *pinValue = getenv(g_user_pin);
-                    if (pinValue!=NULL) {
-                        DEBUG("IMG Environment variable %s is defined with value: %s\n", g_user_pin, pinValue);
-                        fprintf(fp_csf_file, ";pin-value=%s",pinValue);
-                    }
-                }
+            else {
+                g_pkcs11_token |= detect_pkcs11_config(&rvalue[6]);
+                 /* Prepare Token and USR PIN Parameters */
+                if ( g_pkcs11_token == COMPLETE_CONF) {
+                    char *env_result_img = extract_config_value(rvalue);
+                    if (env_result_img != NULL) {
+                        char *pkcs11_token = getenv(env_result_img);
+                        if (pkcs11_token != NULL){
+                            fprintf(fp_csf_file, "\"pkcs11:token=%s;",pkcs11_token);
+                        }
+                        else
+                            fprintf(fp_csf_file, "\"pkcs11:token=%s;",env_result_img);
+                    } else
+                        return -E_FAILURE;
+                    FREE(env_result_img);
 
+                    // Looking for object config value
+                    char *config_object = extract_config_value(strchr(rvalue, ';'));
+                    fprintf(fp_csf_file, "object=%s;",config_object);
+                    FREE(config_object);
+
+                    // Adding Type = Cert
+                    fprintf(fp_csf_file, "type=cert;");
+
+                    // Looking for USR_PIN environment variable
+                    char *config_pin = extract_config_value(strrchr(rvalue,';'));
+                    char *pkcs11_pin = getenv(config_pin);
+                    if (pkcs11_pin != NULL)
+                        fprintf(fp_csf_file, "pin-value=%s",pkcs11_pin);
+                    else
+                        fprintf(fp_csf_file, "pin-value=%s",config_pin);
+                    FREE(config_pin);
+                } else {
+                    fprintf(stderr, "ERROR: Invalid PKCS11 configuration\n");
+                    return -E_FAILURE;
+                }
             }
             fprintf(fp_csf_file, "\"\n");
         }
