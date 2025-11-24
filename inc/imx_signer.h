@@ -103,7 +103,7 @@ typedef enum SOC_TYPE {
 } soc_type_t;
 
 typedef enum PKCS_TOKEN {
-    PCKS11_EN = 1,
+    PCKS11_ENV = 1,
     TOKEN_EN = 2,
     OBJ_TYPE = 4,
     TYPE_CERT = 8,
