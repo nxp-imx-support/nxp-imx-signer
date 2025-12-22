@@ -102,6 +102,15 @@ typedef enum SOC_TYPE {
     ULP,
 } soc_type_t;
 
+typedef enum PKCS_TOKEN {
+    PCKS11_ENV = 1,
+    TOKEN_EN = 2,
+    OBJ_TYPE = 4,
+    TYPE_CERT = 8,
+    USRPIN = 16,
+    COMPLETE_CONF = 31,
+} pkcs11token_type_t;
+
 #define E_OK 0
 #define E_FAILURE 1
 
