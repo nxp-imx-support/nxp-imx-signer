@@ -587,9 +587,9 @@ static int create_csf_file_v1(image_block_t *blocks, int idx, char *ofname)
     fprintf(fp_csf_file, "[Install SRK]\n");
     cfg_parser(fp_cfg, rvalue, RSIZE, "srktable_file");
     if ('\0' == rvalue[0])
-        fprintf(fp_csf_file, "\tFile = \"%s/crts/SRK_1_2_3_4_table.bin\"\n", g_sig_tool_path);
+        fprintf(fp_csf_file, "\tFile = \"%s/crts/SRK_1_2_3_4_table.bin\"\n", g_sig_data_path);
     else
-        fprintf(fp_csf_file, "\tFile = \"%s/crts/%s\"\n", g_sig_tool_path, rvalue);
+        fprintf(fp_csf_file, "\tFile = \"%s/crts/%s\"\n", g_sig_data_path, rvalue);
 
     cfg_parser(fp_cfg, rvalue, RSIZE, "srk_source_index");
     if ('\0' == rvalue[0])
@@ -612,14 +612,14 @@ static int create_csf_file_v1(image_block_t *blocks, int idx, char *ofname)
             } else
                 return -E_FAILURE;
         } else
-            fprintf(fp_csf_file, "\tFile = \"%s/crts/%s\"\n", g_sig_tool_path, rvalue);
+            fprintf(fp_csf_file, "\tFile = \"%s/crts/%s\"\n", g_sig_data_path, rvalue);
     } else {
         /* Prepare normal authentication parameters */
         /* Install CSFK */
         fprintf(fp_csf_file, "[Install CSFK]\n");
         cfg_parser(fp_cfg, rvalue, RSIZE, "csfk_file");
         if ('\0' == rvalue[0])
-            fprintf(fp_csf_file, "\tFile = \"%s/crts/CSF1_1_sha256_2048_65537_v3_usr_crt.pem\"\n", g_sig_tool_path);
+            fprintf(fp_csf_file, "\tFile = \"%s/crts/CSF1_1_sha256_2048_65537_v3_usr_crt.pem\"\n", g_sig_data_path);
         else if (!strncmp (&rvalue[0], "pkcs11",6)) { /* PKCS11 Based Signing */
             char *pkcs11_uri = build_pkcs11_uri(rvalue);
             if (pkcs11_uri != NULL) {
@@ -628,7 +628,7 @@ static int create_csf_file_v1(image_block_t *blocks, int idx, char *ofname)
             } else
                 return -E_FAILURE;
         } else  /* File Based Signing */
-            fprintf(fp_csf_file, "\tFile = \"%s/crts/%s\"\n", g_sig_tool_path, rvalue);
+            fprintf(fp_csf_file, "\tFile = \"%s/crts/%s\"\n", g_sig_data_path, rvalue);
     }
 
     fprintf(fp_csf_file, "[Authenticate CSF]\n");
@@ -730,7 +730,7 @@ static int create_csf_file_v1(image_block_t *blocks, int idx, char *ofname)
 
         cfg_parser(fp_cfg, rvalue, RSIZE, "img_file");
         if ('\0' == rvalue[0])
-            fprintf(fp_csf_file, "\tFile = \"%s/crts/IMG1_1_sha256_2048_65537_v3_usr_crt.pem\"\n", g_sig_tool_path);
+            fprintf(fp_csf_file, "\tFile = \"%s/crts/IMG1_1_sha256_2048_65537_v3_usr_crt.pem\"\n", g_sig_data_path);
         else if (!strncmp (&rvalue[0], "pkcs11",6)) { /* PKCS11 Based Signing */
             char *pkcs11_uri = build_pkcs11_uri(rvalue);
             if (pkcs11_uri != NULL) {
@@ -739,7 +739,7 @@ static int create_csf_file_v1(image_block_t *blocks, int idx, char *ofname)
             } else
                 return -E_FAILURE;
         } else  /* File Based Signing */
-            fprintf(fp_csf_file, "\tFile = \"%s/crts/%s\"\n", g_sig_tool_path, rvalue);
+            fprintf(fp_csf_file, "\tFile = \"%s/crts/%s\"\n", g_sig_data_path, rvalue);
     }
 
     /* Authenticate Data */
@@ -836,13 +836,13 @@ static int create_csf_file_v3(char *csf_filename, char *ifname, csf_params_t *cs
 
     cfg_parser(fp_cfg, rvalue, RSIZE, "srktable_file");
     if ('\0' == rvalue[0])
-        fprintf(fp_csf_file, "\tFile = \"%s/crts/SRK_1_2_3_4_table.bin\"\n", g_sig_tool_path);
+        fprintf(fp_csf_file, "\tFile = \"%s/crts/SRK_1_2_3_4_table.bin\"\n", g_sig_data_path);
     else
-        fprintf(fp_csf_file, "\tFile = \"%s/crts/%s\"\n", g_sig_tool_path, rvalue);
+        fprintf(fp_csf_file, "\tFile = \"%s/crts/%s\"\n", g_sig_data_path, rvalue);
 
     cfg_parser(fp_cfg, rvalue, RSIZE, "srk_source");
     if ('\0' == rvalue[0])
-        fprintf(fp_csf_file, "\tSource = \"%s/crts/SRK1_sha256_prime256v1_v3_ca_crt.pem\"\n", g_sig_tool_path);
+        fprintf(fp_csf_file, "\tSource = \"%s/crts/SRK1_sha256_prime256v1_v3_ca_crt.pem\"\n", g_sig_data_path);
     else
         fprintf(fp_csf_file, "\tSource = \"%s/crts/%s\"\n", g_sig_data_path, rvalue);
 
@@ -870,7 +870,7 @@ static int create_csf_file_v3(char *csf_filename, char *ifname, csf_params_t *cs
     if ('\0' != rvalue[0]) {
         fprintf(fp_csf_file, "[Install Certificate]\n");
 
-        fprintf(fp_csf_file, "\tFile = \"%s/crts/%s\"\n", g_sig_tool_path, rvalue);
+        fprintf(fp_csf_file, "\tFile = \"%s/crts/%s\"\n", g_sig_data_path, rvalue);
 
         cfg_parser(fp_cfg, rvalue, RSIZE, "sgk_permissions");
         if ('\0' == rvalue[0])
@@ -979,7 +979,7 @@ static int create_spsdk_yaml_file(char *yaml_filename)
     /* Signature Provider to send password as a file along with the priv key */
     cfg_parser(fp_cfg, rvalue, RSIZE, "signature_provider");
     if ('\0' == rvalue[0])
-        fprintf(fp_yaml_file, "signature_provider: type=file;file_path=%s/keys/SRK1_sha256_prime256v1_v3_ca_key.pem;password=%s/keys/key_pass.txt\n", g_sig_tool_path, g_sig_tool_path);
+        fprintf(fp_yaml_file, "signature_provider: type=file;file_path=%s/keys/SRK1_sha256_prime256v1_v3_ca_key.pem;password=%s/keys/key_pass.txt\n", g_sig_data_path, g_sig_data_path);
     else
         fprintf(fp_yaml_file, "signature_provider: type=file;file_path=%s/keys/%s;password=%s/keys/key_pass.txt\n", g_sig_data_path, rvalue, g_sig_data_path);
 
@@ -995,25 +995,25 @@ static int create_spsdk_yaml_file(char *yaml_filename)
     fprintf(fp_yaml_file, "  srk_array:\n");
     cfg_parser(fp_cfg, rvalue, RSIZE, "srk_array_0");
     if ('\0' == rvalue[0])
-        fprintf(fp_yaml_file, "    - %s/crts/SRK1_sha256_prime256v1_v3_ca_crt.pem\n", g_sig_tool_path);
+        fprintf(fp_yaml_file, "    - %s/crts/SRK1_sha256_prime256v1_v3_ca_crt.pem\n", g_sig_data_path);
     else
         fprintf(fp_yaml_file, "    - %s/crts/%s\n", g_sig_data_path, rvalue);
 
     cfg_parser(fp_cfg, rvalue, RSIZE, "srk_array_1");
     if ('\0' == rvalue[0])
-        fprintf(fp_yaml_file, "    - %s/crts/SRK2_sha256_prime256v1_v3_ca_crt.pem\n", g_sig_tool_path);
+        fprintf(fp_yaml_file, "    - %s/crts/SRK2_sha256_prime256v1_v3_ca_crt.pem\n", g_sig_data_path);
     else
         fprintf(fp_yaml_file, "    - %s/crts/%s\n", g_sig_data_path, rvalue);
 
     cfg_parser(fp_cfg, rvalue, RSIZE, "srk_array_2");
     if ('\0' == rvalue[0])
-        fprintf(fp_yaml_file, "    - %s/crts/SRK3_sha256_prime256v1_v3_ca_crt.pem\n", g_sig_tool_path);
+        fprintf(fp_yaml_file, "    - %s/crts/SRK3_sha256_prime256v1_v3_ca_crt.pem\n", g_sig_data_path);
     else
         fprintf(fp_yaml_file, "    - %s/crts/%s\n", g_sig_data_path, rvalue);
 
     cfg_parser(fp_cfg, rvalue, RSIZE, "srk_array_3");
     if ('\0' == rvalue[0])
-        fprintf(fp_yaml_file, "    - %s/crts/SRK4_sha256_prime256v1_v3_ca_crt.pem\n", g_sig_tool_path);
+        fprintf(fp_yaml_file, "    - %s/crts/SRK4_sha256_prime256v1_v3_ca_crt.pem\n", g_sig_data_path);
     else
         fprintf(fp_yaml_file, "    - %s/crts/%s\n", g_sig_data_path, rvalue);
 
