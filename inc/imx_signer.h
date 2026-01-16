@@ -86,7 +86,6 @@ const char* desc_opt[] =
 #define IVT_HEADER_TAG_B0           0x87
 #define IVT_HEADER_TAG_MSG          0x89
 
-
 #define IMAGE_TYPE_MASK             0xF
 
 #define CONTAINER_ALIGNMENT         0x400
@@ -204,7 +203,7 @@ unsigned char g_ivt_v1_mask[] = {0xFF,0xFF,0xFF,0xF0};
 unsigned char g_ivt_v1[] = {0xD1,0x00,0x20,0x41};
 
 
-unsigned char g_ivt_v3_mask[] = {0xff, 0x00, 0x00, 0xff};
+unsigned char g_ivt_v3_mask[] = {0xf0, 0x00, 0x00, 0xff};
 /* array contains tag_b0, tag_msg*/
 unsigned char g_ivt_v3_ahab_array[2][4] = {{0x00 ,0x00, 0x00, 0x87},/*tag_b0*/
                                            {0x00 ,0x00, 0x00, 0x89}};/*tag_msg*/
@@ -212,6 +211,10 @@ unsigned char g_ivt_v3_ahab_array[2][4] = {{0x00 ,0x00, 0x00, 0x87},/*tag_b0*/
 #define TAG_MSG 0x89
 #define TAG_SIG_BLK 0x90
 #define AHAB_1K_ALIGN 0x400
+#define CNTR_HDR_VER_AHAB_V1    0x00
+#define CNTR_HDR_VER_AHAB_V2    0x02
+#define SIG_BLK_HDR_VER_AHAB_V1 0x00
+#define SIG_BLK_HDR_VER_AHAB_V2 0x01
 
 /*
  * header tag check happens at every 0x400 offset inside the image as per NXP
@@ -261,10 +264,13 @@ unsigned char g_ivt_v3_ahab_array[2][4] = {{0x00 ,0x00, 0x00, 0x87},/*tag_b0*/
              *  - Signature block header tag and version                            \
              *  - Version                                                           \
              */                                                                     \
-                if (hdr_v3->length >= AHAB_CONTAINER_MIN_LENGTH                     \
+                if ((hdr_v3->version == CNTR_HDR_VER_AHAB_V1 ||                     \
+                     hdr_v3->version == CNTR_HDR_VER_AHAB_V2)                       \
+                    && hdr_v3->length >= AHAB_CONTAINER_MIN_LENGTH                  \
                     && (!hdr_v3->reserved)                                          \
+                    && (sig_blk_hdr->version == SIG_BLK_HDR_VER_AHAB_V1 ||          \
+                        sig_blk_hdr->version == SIG_BLK_HDR_VER_AHAB_V2)            \
                     && sig_blk_hdr->tag == TAG_SIG_BLK                              \
-                    && (!sig_blk_hdr->version)                                      \
                     && (!sig_blk_hdr->reserved))                                    \
                     is_valid = true;                                                \
             } else  if (hdr_v3->tag == TAG_MSG) {                                   \
