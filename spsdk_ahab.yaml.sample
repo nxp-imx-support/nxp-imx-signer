@@ -1,0 +1,35 @@
+# -------------------------------------===== The chip family name [Required] =====--------------------------------------
+family: mimx9352
+# -----------------------------------------===== MCU revision [Optional] =====------------------------------------------
+revision: latest
+# -----------------------------------===== Super Root Key (SRK) set [Required] =====------------------------------------
+srk_set: oem
+# ------------------------------------===== Used SRK [Conditionally required] =====-------------------------------------
+used_srk_id: 0
+# -------------------------------------===== AHAB container signer [Optional] =====-------------------------------------
+signer: SRK1_sha256_prime256v1_v3_ca_key.pem
+## ---------------------===== AHAB container signer for second signature (PQC only) [Optional] =====---------------------
+#signer_#2: SRK1_mldsa44.pem
+# ------------------------------------===== SRK Table [Conditionally required] =====------------------------------------
+srk_table:
+  # -------------------------------------------===== CA Flag [Optional] =====-------------------------------------------
+  flag_ca: true
+  # ---------------------------------------===== Hash Algorithm [Optional] =====----------------------------------------
+  hash_algorithm: sha256
+  # ---------------------------------===== Super Root Key (SRK) table [Required] =====----------------------------------
+  srk_array:
+    - SRK1_sha256_prime256v1_v3_ca_crt.pem
+    - SRK2_sha256_prime256v1_v3_ca_crt.pem
+    - SRK3_sha256_prime256v1_v3_ca_crt.pem
+    - SRK4_sha256_prime256v1_v3_ca_crt.pem
+#  srk_table_#2:
+#    # ------------------------------------------===== CA Flag [Optional] =====------------------------------------------
+#    flag_ca: false
+#    # --------------------------------------===== Hash Algorithm [Optional] =====---------------------------------------
+#    hash_algorithm: default
+#    # --------------------------------===== Super Root Key (SRK) table [Required] =====---------------------------------
+#    srk_array:
+#      - SRK1_mldsa44.pub
+#      - SRK2_mldsa44.pub
+#      - SRK3_mldsa44.pub
+#      - SRK4_mldsa44.pub

@@ -211,6 +211,124 @@ static int find_cst_tool(char *cst_path)
 }
 
 /*
+ * @brief       Modify config filename to analyze and insert path for keys and
+ *              certificates. If "type=" string is not found, this function
+ *              assumes user has correctly provided the signer parameter value.
+ *              This function creates new config file.
+ *
+ * @param[in]   cfgname : Input config filename
+ * @param[out]  new_cfgname : Output buffer for new filename
+ * @param[in]   buf_size : Size of output buffer
+ *
+ * @retval      -E_FAILURE : Failure
+ *               E_OK      : Success
+ */
+static int modify_cfgfile(char *cfgname, char *new_cfgname, size_t buf_size)
+{
+    ASSERT(cfgname, -1);
+    ASSERT(new_cfgname, -1);
+    ASSERT(g_sig_data_path, -1);
+
+    FILE *fp_in = NULL;
+    FILE *fp_out = NULL;
+    char line[512] = {0};
+
+    /* Create new filename */
+    if (0 > (snprintf(new_cfgname, buf_size, "nxpimage_config.yaml"))) {
+        fprintf(stderr, "ERROR: Failed to create new config filename. Exiting.\n");
+        return -E_FAILURE;
+    }
+
+    /* Open input file */
+    fp_in = fopen(cfgname, "r");
+    if (NULL == fp_in) {
+        fprintf(stderr, "ERROR: Failed to open config file %s. Exiting.\n", cfgname);
+        return -E_FAILURE;
+    }
+
+    /* Open output file */
+    fp_out = fopen(new_cfgname, "w");
+    if (NULL == fp_out) {
+        fprintf(stderr, "ERROR: Failed to create new config file %s. Exiting.\n", new_cfgname);
+        FCLOSE(fp_in);
+        return -E_FAILURE;
+    }
+
+    /* Process each line */
+    while (fgets(line, sizeof(line), fp_in)) {
+        char *string_start = NULL;
+        char *string_start_trimmed = NULL;
+        char *line_start = line;
+
+        // DEBUG("Processing line (len=%zu): %s\n", strlen(line), line);
+
+         /* Skip leading whitespace to find logical line start */
+        while (*line_start == ' ' || *line_start == '\t') {
+            line_start++;
+        }
+
+        /* Skip empty lines and comments */
+        if (*line_start == '\0' || *line_start == '\n' || *line_start == '#') {
+            // fprintf(fp_out, "%s", line);
+            continue;
+        }
+
+        /* Check for "signer: " or "signer_#2: " at the beginning (after whitespace) */
+        if (strncmp(line, "signer: ", 8) == 0) {
+            string_start = line + 8;  // strlen("signer: ")
+        } else if (strncmp(line, "signer_#2: ", 11) == 0) {
+            string_start = line + 11;  // strlen("signer_#2: ")
+        }
+
+        /* Check if "type=" is present. This means user has added their own signer configuration so no modification necessary */
+        if (string_start && strncmp(string_start, "type=", 5) != 0) {
+            string_start_trimmed = strtok(string_start, "\n\r");
+            /* No "type=" found, prepend SIG_DATA_PATH */
+            /* Write everything before string_start_trimmed */
+            fwrite(line, 1, string_start_trimmed - line, fp_out);
+            /* Write g_sig_data_path and the rest */
+            fprintf(fp_out, "type=file;file_path=%s/keys/%s;password=%s/keys/key_pass.txt\n", g_sig_data_path, string_start_trimmed, g_sig_data_path);
+            continue;
+        }
+
+        /* Check if line contains "srk_array:" */
+        if (strstr(line, "srk_array:")) {
+            /* Write the srk_array: line */
+            fprintf(fp_out, "%s", line);
+
+            /* Process next 4 lines */
+            for (int i = 0; i < 4; i++) {
+                if (fgets(line, sizeof(line), fp_in)) {
+                    char *dash_pos = strstr(line, "- ");
+                    if (dash_pos) {
+                        string_start = dash_pos + 2;  // strlen("- ")
+                        string_start_trimmed = strtok(string_start, "\n\r");
+                        if (string_start_trimmed) {
+                            /* Write everything before the value */
+                            fwrite(line, 1, string_start - line, fp_out);
+                            /* Write g_sig_data_path and the value */
+                            fprintf(fp_out, "%s/crts/%s\n", g_sig_data_path, string_start_trimmed);
+                        }
+                    } else {
+                        fprintf(stderr, "ERROR: Unexpected values under the srk_array. \n");
+                    }
+                }
+            }
+            continue;
+        }
+
+        /* Not a signer or srk_array line, write as-is */
+        fprintf(fp_out, "%s", line);
+    }
+
+    FCLOSE(fp_in);
+    FCLOSE(fp_out);
+
+    return E_OK;
+}
+
+
+/*
  * @brief       Common function to call SPSPDK nxpimage to sign the generated 
  *              YAML config file
  *
@@ -230,13 +348,20 @@ int sign_yaml_config(char *cfgname, char *ifname, char *ofname)
     char sys_cmd[SYS_CMD_LEN] = {0};
     char spsdk_extra_param[10] = {0};
 
+    char new_cfgname[256] = {0};
+
+    if (modify_cfgfile(cfgname, new_cfgname, sizeof(new_cfgname)) != E_OK) {
+        fprintf(stderr, "ERROR: Failed to modify YAML config file. %s\n", cfgname);
+        return -E_FAILURE;
+    }
+
     /* Add debug info to the tool output */
     if (g_debug)
         strncpy(spsdk_extra_param, "-v", 3);
 
     /* Find if tool exists and capture path */
     if (!find_spsdk_tool(&sys_cmd[0])) {
-        if (0 > (snprintf(sys_cmd + strlen(sys_cmd), (SYS_CMD_LEN - strlen(sys_cmd)), " %s ahab sign --force -c %s -b %s -o %s", spsdk_extra_param, cfgname, ifname, ofname))) {
+        if (0 > (snprintf(sys_cmd + strlen(sys_cmd), (SYS_CMD_LEN - strlen(sys_cmd)), " %s ahab sign --force -c %s -b %s -o %s", spsdk_extra_param, new_cfgname, ifname, ofname))) {
             fprintf(stderr, "ERROR: System command build unsuccessful. Exiting.\n");
             return -E_FAILURE;
         }
@@ -1496,7 +1621,7 @@ static void print_usage(void)
 {
     int i = 0;
     printf("IMX Signer: IMX helper tool to auto-sign image using CST/SPSDK.\n"
-        "Usage: SIG_TOOL_PATH=<sig-tool-path> SIG_DATA_PATH=<sig-data-path>./cst_signer ");
+        "Usage: SIG_TOOL_PATH=<sig-tool-path> SIG_DATA_PATH=<sig-data-path> ./imx_signer ");
     do {
         printf("-%c <%s> ", long_opt[i].val, long_opt[i].name);
         i++;

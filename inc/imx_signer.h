@@ -38,7 +38,7 @@ const struct option long_opt[] =
 const char* desc_opt[] =
 {
     "Input image to be signed",
-    "Input config file to prepare CSF/YAML config (See csf_ahab.cfg.sample/csf_hab.cfg.sample/spsdk_ahab.cfg.sample for details)",
+    "Input config file to prepare CSF/YAML config (See csf_hab.cfg.sample/csf_hab4_pkcs11.cfg.sample/spsdk_ahab.yaml.sample for details)",
     "(Optional) Offset to the start of image",
     "(Optional) Enable debug information",
     "(Optional) FDT debug information",
