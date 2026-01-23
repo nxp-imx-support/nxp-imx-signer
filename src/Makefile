@@ -16,8 +16,8 @@ DATADIR  ?= $(PREFIX)/share
 
 SIGNER_NAME = imx_signer
 
-#DEPS = $(SIGNER_NAME).h cfg_parser.h mkimage_helper.h
-SRCS = $(SIGNER_NAME).c cfg_parser.c mkimage_helper.c fdt.c
+#DEPS = $(SIGNER_NAME).h cfg_parser.h
+SRCS = $(SIGNER_NAME).c cfg_parser.c fdt.c
 OBJS = $(SRCS:.c=.o)
 
 .PHONY: all install clean
