@@ -608,8 +608,11 @@ static int create_csf_file_v1(image_block_t *blocks, int idx, char *ofname)
             if (pkcs11_uri != NULL) {
                 fprintf(fp_csf_file, "\tFile = %s\n", pkcs11_uri);
                 FREE(pkcs11_uri);
-            } else
+            } else {
+                FCLOSE(fp_csf_file);
+                FCLOSE(fp_cfg);
                 return -E_FAILURE;
+            }
         } else
             fprintf(fp_csf_file, "\tFile = \"%s/crts/%s\"\n", g_sig_data_path, rvalue);
     } else {
@@ -624,8 +627,11 @@ static int create_csf_file_v1(image_block_t *blocks, int idx, char *ofname)
             if (pkcs11_uri != NULL) {
                 fprintf(fp_csf_file, "\tFile = %s\n", pkcs11_uri);
                 FREE(pkcs11_uri);
-            } else
+            } else {
+                FCLOSE(fp_csf_file);
+                FCLOSE(fp_cfg);
                 return -E_FAILURE;
+            }
         } else  /* File Based Signing */
             fprintf(fp_csf_file, "\tFile = \"%s/crts/%s\"\n", g_sig_data_path, rvalue);
     }
@@ -735,8 +741,11 @@ static int create_csf_file_v1(image_block_t *blocks, int idx, char *ofname)
             if (pkcs11_uri != NULL) {
                 fprintf(fp_csf_file, "\tFile = %s\n", pkcs11_uri);
                 FREE(pkcs11_uri);
-            } else
+            } else {
+                FCLOSE(fp_csf_file);
+                FCLOSE(fp_cfg);
                 return -E_FAILURE;
+            }
         } else  /* File Based Signing */
             fprintf(fp_csf_file, "\tFile = \"%s/crts/%s\"\n", g_sig_data_path, rvalue);
     }
