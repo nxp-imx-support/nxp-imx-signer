@@ -1,0 +1,143 @@
+{
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "spdxVersion": "SPDX-2.3",
+  "creationInfo": {
+    "created": "2026-01-29T06:29:59Z",
+    "creators": [
+      "Organization: NXP"
+    ],
+    "licenseListVersion": "3.26"
+  },
+  "name": "nxp-cst-signer-v3.0",
+  "dataLicense": "CC0-1.0",
+  "documentNamespace": "https://nxp.com/spdx/e6f89235-928a-46e9-9ab4-e4ca2cfa5b30",
+  "packages": [
+    {
+      "SPDXID": "SPDXRef-package-033643e9-8ae8-4e82-a91d-21ca1d484098",
+      "name": "DTC - libfdt",
+      "versionInfo": "1.4.0",
+      "licenseConcluded": "(BSD-2-Clause OR GPL-2.0-or-later)",
+      "licenseDeclared": "(BSD-2-Clause OR GPL-2.0-or-later)",
+      "homepage": "http://git.jdl.com/gitweb/?p=dtc.git",
+      "downloadLocation": "http://git.jdl.com/gitweb/?p=dtc.git;a=commit;h=65cc4d2748a2c2e6f27f1cf39e07a5dbabd80ebf",
+      "originator": "Organization: DTC - libfdt",
+      "supplier": "NOASSERTION",
+      "externalRefs": [],
+      "filesAnalyzed": false
+    },
+    {
+      "SPDXID": "SPDXRef-package-1bd91ae1-b2cc-458b-b6b4-3756b93f12fd",
+      "name": "device-tree-compiler",
+      "versionInfo": "1.4.2",
+      "licenseConcluded": "GPL-2.0-or-later",
+      "licenseDeclared": "GPL-2.0-or-later",
+      "homepage": "http://git.jdl.com/gitweb/?p=dtc.git",
+      "downloadLocation": "http://http.debian.net/debian/pool/main/d/device-tree-compiler",
+      "originator": "Organization: debian",
+      "supplier": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:deb/debian/device-tree-compiler@1.4.2-1",
+          "referenceType": "purl"
+        },
+        {
+          "referenceCategory": "OTHER",
+          "referenceLocator": "0a7e65ff-5cce-4f55-b9fb-f4bf387677f2",
+          "referenceType": "BlackDuck-ComponentOrigin"
+        }
+      ],
+      "filesAnalyzed": false
+    },
+    {
+      "SPDXID": "SPDXRef-package-78fa9655-24ee-4a22-8f12-c76f302d3a76",
+      "name": "libgcrypt",
+      "versionInfo": "1.9.25",
+      "licenseConcluded": "(BSD-3-Clause AND GPL-2.0-or-later AND Apache-2.0)",
+      "licenseDeclared": "(BSD-3-Clause AND GPL-2.0-or-later AND Apache-2.0)",
+      "homepage": "http://www.gnupg.org",
+      "downloadLocation": "NOASSERTION",
+      "originator": "Organization: rocky",
+      "supplier": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "OTHER",
+          "referenceLocator": "176aaf14-1ce6-4bc8-bedc-d15579a118cd",
+          "referenceType": "BlackDuck-ComponentOrigin"
+        },
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:rpm/rocky/virtio-win@1.9.25-2.el9_0?arch=noarch",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false
+    },
+    {
+      "SPDXID": "SPDXRef-package-88189e67-1b4a-4dc0-8228-93584a2a0532",
+      "name": "u-boot-imx",
+      "versionInfo": "v2017.11-rc3",
+      "licenseConcluded": "GPL-2.0-or-later",
+      "licenseDeclared": "GPL-2.0-or-later",
+      "homepage": "https://github.com/Freescale/u-boot-imx",
+      "downloadLocation": "NOASSERTION",
+      "originator": "Organization: freescale",
+      "supplier": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "OTHER",
+          "referenceLocator": "15d07bdb-ae81-442b-9e92-bb0abe0bc3ac",
+          "referenceType": "BlackDuck-ComponentOrigin"
+        },
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:github/Freescale/u-boot-imx@v2017.11-rc3",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false
+    },
+    {
+      "SPDXID": "SPDXRef-package-e6f89235-928a-46e9-9ab4-e4ca2cfa5b30",
+      "name": "nxp-cst-signer",
+      "versionInfo": "v3.0",
+      "licenseConcluded": "(GPL-2.0-only)",
+      "licenseDeclared": "(GPL-2.0-only)",
+      "downloadLocation": "NOASSERTION",
+      "originator": "Organization: nxp-cst-signer",
+      "supplier": "NOASSERTION",
+      "externalRefs": [],
+      "filesAnalyzed": false
+    }
+  ],
+  "relationships": [
+    {
+      "spdxElementId": "SPDXRef-package-e6f89235-928a-46e9-9ab4-e4ca2cfa5b30",
+      "relationshipType": "OTHER",
+      "relatedSpdxElement": "SPDXRef-package-1bd91ae1-b2cc-458b-b6b4-3756b93f12fd",
+      "comment": "Separate Work"
+    },
+    {
+      "spdxElementId": "SPDXRef-package-e6f89235-928a-46e9-9ab4-e4ca2cfa5b30",
+      "relationshipType": "OTHER",
+      "relatedSpdxElement": "SPDXRef-package-78fa9655-24ee-4a22-8f12-c76f302d3a76",
+      "comment": "Separate Work"
+    },
+    {
+      "spdxElementId": "SPDXRef-package-e6f89235-928a-46e9-9ab4-e4ca2cfa5b30",
+      "relationshipType": "OTHER",
+      "relatedSpdxElement": "SPDXRef-package-88189e67-1b4a-4dc0-8228-93584a2a0532",
+      "comment": "Separate Work"
+    },
+    {
+      "spdxElementId": "SPDXRef-package-e6f89235-928a-46e9-9ab4-e4ca2cfa5b30",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-package-033643e9-8ae8-4e82-a91d-21ca1d484098"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-package-e6f89235-928a-46e9-9ab4-e4ca2cfa5b30"
+    }
+  ]
+}
