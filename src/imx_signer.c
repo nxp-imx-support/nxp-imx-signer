@@ -1267,6 +1267,7 @@ static int process_ivt_image(unsigned long off, uint8_t *infile_buf,
     ivt_t *ivt = NULL;
     int err = -E_FAILURE;
     boot_data_t *boot = NULL;
+    image_block_t image_ivt[NUM_IMGS] = {0};
 
     /* Compare the entry address with self address. For kernel images
      * IVT is placed at the end of the image file. In this case the load
@@ -1274,16 +1275,16 @@ static int process_ivt_image(unsigned long off, uint8_t *infile_buf,
      * self (where the ivt is ) and entry (the beginning of the image).
      * This difference in case of kernel images is 0. For other images like
      * FDT image the offset is non zero*/
-    g_images[0].valid = true;
+    image_ivt[0].valid = true;
     ivt = (ivt_t *)(infile_buf + off);
 
-    g_images[0].load_addr = (ivt->self_addr > ivt->entry)
+    image_ivt[0].load_addr = (ivt->self_addr > ivt->entry)
                             ? ivt->entry
                             : ivt->self_addr;
-    g_images[0].offset = (ivt->self_addr > ivt->entry)
+    image_ivt[0].offset = (ivt->self_addr > ivt->entry)
                          ? (off - (ivt->self_addr - ivt->entry))
                          : off;
-    g_images[0].size =  (ivt->self_addr > ivt->entry)
+    image_ivt[0].size =  (ivt->self_addr > ivt->entry)
                         ? (ivt->csf_addr - ivt->entry)
                         : (ivt->csf_addr - ivt->self_addr);
     csf_offset =  (ivt->csf_addr - ivt->self_addr) + off;
@@ -1298,12 +1299,13 @@ static int process_ivt_image(unsigned long off, uint8_t *infile_buf,
         }
     }
 
-    DEBUG("Image[%d] addr 0x%08lx\n",0, g_images[0].load_addr);
-    DEBUG("Image[%d] offset  0x%08lx\n",0, g_images[0].offset);
-    DEBUG("Image[%d] size 0x%08lx\n",0, g_images[0].size);
+    DEBUG("Image[%d] addr 0x%08lx\n",0, image_ivt[0].load_addr);
+    DEBUG("Image[%d] offset  0x%08lx\n",0, image_ivt[0].offset);
+    DEBUG("Image[%d] size 0x%08lx\n",0, image_ivt[0].size);
     DEBUG("Image[%d] csf_offset 0x%08x\n",0, csf_offset);
+    memcpy(g_images, image_ivt, sizeof(image_block_t));
 
-    err = create_csf_file_v1(g_images, loop, ofname);
+    err = create_csf_file_v1(image_ivt, loop, ofname);
     if (err) {
         errno = EFAULT;
         fprintf(stderr, "ERROR: Couldn't create csf txt file %s\n", strerror(EFAULT));
