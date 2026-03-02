@@ -619,22 +619,18 @@ static char *build_pkcs11_uri(const char *rvalue) {
             strncat(pkcs11_uri, pkcs11_token_pin, PKCS11_URI_BUFFER_SIZE - strlen(pkcs11_uri));
         else
             strncat(pkcs11_uri, env_result, PKCS11_URI_BUFFER_SIZE - strlen(pkcs11_uri));
-        FREE(env_result);
     } else
         goto err;
 
     /* Close the URI string */
     strncat(pkcs11_uri, "\"", PKCS11_URI_BUFFER_SIZE - strlen(pkcs11_uri));
 
-    FREE(pkcs11_token_pin);
     FREE(config_object);
     FREE(env_result);
-    FREE(pkcs11_uri);
 
     return pkcs11_uri;
 
 err:
-    FREE(pkcs11_token_pin);
     FREE(config_object);
     FREE(env_result);
     FREE(pkcs11_uri);
