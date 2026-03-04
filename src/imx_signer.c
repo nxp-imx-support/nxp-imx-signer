@@ -5,6 +5,7 @@
  */
 
 #include <limits.h>
+#include <ctype.h>
 
 #include <imx_signer.h>
 #include <cfg_parser.h>
@@ -486,68 +487,23 @@ err:
     FCLOSE(fp_ofname);
     return -E_FAILURE;
 }
-/*
- * @brief       Extract config value from a string with environment variable handling
- *
- * @param[in]   rvalue        : Configuration value string
- *
- * @retval      config_value  : Extracted config value with env variable resolved
- */
-static char *extract_config_value(const char *rvalue)
+static const char *skip_space(const char *s)
 {
-    char *search_equal = strchr(rvalue, '=');
-    char *config_value = malloc(100);
-    int skip = 0;
-
-    if (search_equal == NULL || config_value == NULL ) {
-        DEBUG("Search Token Error\n");
-        DEBUG("Memory allocation failed\n");
+    if (!s)
         return NULL;
-    }
-
-    strncpy(&config_value[0],&search_equal[1],99);
-    config_value[99]='\0';
-    strtok(config_value, ";");
-    if (config_value == NULL) {
-        FREE(config_value);
-        return NULL;
-    }
-
-    char *source = &config_value[0];
-    if (*source == '$') {
-        skip++;
-        if (source[1] == '{') {
-            skip++;
-        }
-    }
-    strncpy(&config_value[0], source + skip,99);
-    config_value[99]='\0';
-    strtok(&config_value[0], "}");
-
-    return config_value;
+    while (*s && isspace((unsigned char)*s))
+        s++;
+    return s;
 }
-/*
- * @brief       Detect and validate PKCS11 Config Param
- *
- * @param[in]   config_value : String with the PKCS11 configuration parameters
- *
- * @retval      flags        : PKCS11 configuration validation flags
- */
-static int detect_pkcs11_config(const char *config_value) {
-    if (!config_value)
-        return 0;
-    int flags = 0;
-    if (strstr(config_value, "pkcs11"))
-        flags |= PCKS11_ENV;
-    if (strstr(config_value, "token="))
-        flags |= TOKEN_EN;
-    if (strstr(config_value, "object="))
-            flags |= OBJ_TYPE;
-    if (strstr(config_value, "type=cert"))
-        flags |= TYPE_CERT;
-    if (strstr(config_value, "pin-value"))
-        flags |= USRPIN;
-    return flags;
+
+static bool is_pkcs11_value(const char *value)
+{
+    const char *s = skip_space(value);
+    if (!s)
+        return false;
+    if (*s == '"')
+        s++;
+    return !strncmp(s, "pkcs11", 5);
 }
 
 /*
@@ -561,84 +517,40 @@ static int detect_pkcs11_config(const char *config_value) {
 static char *build_pkcs11_uri(const char *rvalue) {
     ASSERT(rvalue, NULL);
 
-    char *pkcs11_uri = NULL;        /* PKCS11 URI string buffer */
-    char *env_result = NULL;        /* Env result for Token*/
-    char *config_object = NULL;     /* Configuration object identifier */
-    char *pkcs11_token_pin = NULL;  /* Token or Pin values*/
-
-    /* Allocate buffer for the complete PKCS11 URI */
-    pkcs11_uri = calloc(PKCS11_URI_BUFFER_SIZE+1, sizeof(char));
-    if (NULL == pkcs11_uri) {
-        DEBUG("ERROR: Error allocating memory for PKCS11 URI\n");
+    const char *start = skip_space(rvalue);
+    if (!start)
         return NULL;
+
+    const char *end = start + strlen(start);
+    while (end > start && isspace((unsigned char)end[-1]))
+        end--;
+
+    const size_t len = (size_t)(end - start);
+    if (len == 0)
+        return NULL;
+
+    const bool already_quoted = (len >= 2 && start[0] == '"' && end[-1] == '"');
+
+    char *pkcs11_uri = NULL;
+    if (already_quoted) {
+        pkcs11_uri = malloc(len + 1);
+        if (!pkcs11_uri)
+            return NULL;
+        memcpy(pkcs11_uri, start, len);
+        pkcs11_uri[len] = '\0';
+    } else {
+        pkcs11_uri = malloc(len + 3);
+        if (!pkcs11_uri)
+            return NULL;
+        pkcs11_uri[0] = '"';
+        memcpy(pkcs11_uri + 1, start, len);
+        pkcs11_uri[len + 1] = '"';
+        pkcs11_uri[len + 2] = '\0';
     }
 
-    /* Check if configuration is complete */
-    g_pkcs11_token = detect_pkcs11_config(rvalue); /* Set global flag*/
-    if ( g_pkcs11_token != COMPLETE_CONF) {
-        DEBUG("ERROR: Invalid PKCS11 configuration \n");
-        goto err;
-    }
-
-    /* Start building the PKCS11 URI */
-    strncpy(pkcs11_uri, "\"pkcs11:token=", 15);
-
-    /* Extract and process token configuration */
-    env_result = extract_config_value(rvalue);
-    if (env_result != NULL) {
-        pkcs11_token_pin = getenv(env_result);
-        if (pkcs11_token_pin != NULL) {
-            DEBUG("Token env variable PKCS11_Token: %s\n", pkcs11_token_pin);
-            strncat(pkcs11_uri, pkcs11_token_pin, PKCS11_URI_BUFFER_SIZE - strlen(pkcs11_uri));
-        } else
-            strncat(pkcs11_uri, env_result, PKCS11_URI_BUFFER_SIZE - strlen(pkcs11_uri));
-    } else
-        goto err;
-
-    /* Extract and add object configuration */
-    config_object = extract_config_value(strchr(rvalue, ';'));
-    if (config_object != NULL) {
-        strncat(pkcs11_uri, ";object=", PKCS11_URI_BUFFER_SIZE - strlen(pkcs11_uri));
-        strncat(pkcs11_uri, config_object, PKCS11_URI_BUFFER_SIZE - strlen(pkcs11_uri));
-    } else
-        goto err;
-
-    pkcs11_token_pin = NULL;
-    env_result = NULL;
-
-    /* Add type=cert */
-    strncat(pkcs11_uri, ";type=cert", PKCS11_URI_BUFFER_SIZE - strlen(pkcs11_uri));
-
-    /* Extract and add PIN configuration */
-    env_result = extract_config_value(strrchr(rvalue, ';'));
-    if (env_result != NULL) {
-        pkcs11_token_pin = getenv(env_result);
-        DEBUG("USR_PIN environment variable %s and %s\n", env_result, pkcs11_token_pin);
-        strncat(pkcs11_uri, ";pin-value=", PKCS11_URI_BUFFER_SIZE - strlen(pkcs11_uri));
-        if (pkcs11_token_pin != NULL)
-            strncat(pkcs11_uri, pkcs11_token_pin, PKCS11_URI_BUFFER_SIZE - strlen(pkcs11_uri));
-        else
-            strncat(pkcs11_uri, env_result, PKCS11_URI_BUFFER_SIZE - strlen(pkcs11_uri));
-        FREE(env_result);
-    } else
-        goto err;
-
-    /* Close the URI string */
-    strncat(pkcs11_uri, "\"", PKCS11_URI_BUFFER_SIZE - strlen(pkcs11_uri));
-
-    FREE(pkcs11_token_pin);
-    FREE(config_object);
-    FREE(env_result);
-    FREE(pkcs11_uri);
-
+    /* Enable CST PKCS11 backend whenever a PKCS11 URI is used. */
+    g_pkcs11_token = 1;
     return pkcs11_uri;
-
-err:
-    FREE(pkcs11_token_pin);
-    FREE(config_object);
-    FREE(env_result);
-    FREE(pkcs11_uri);
-    return NULL;
 }
 /*
  * @brief       Create CSF source file for IVT type v1
@@ -728,7 +640,7 @@ static int create_csf_file_v1(image_block_t *blocks, int idx, char *ofname)
         fast_auth = true;
         /* Install NOCAK */
         fprintf(fp_csf_file, "[Install NOCAK]\n");
-        if (!strncmp (&rvalue[0], "pkcs11",6)) { /* PKCS11 Based Signing */
+        if (is_pkcs11_value(rvalue)) {
             char *pkcs11_uri = build_pkcs11_uri(rvalue);
             if (pkcs11_uri != NULL) {
                 fprintf(fp_csf_file, "\tFile = %s\n", pkcs11_uri);
@@ -747,7 +659,7 @@ static int create_csf_file_v1(image_block_t *blocks, int idx, char *ofname)
         cfg_parser(fp_cfg, rvalue, RSIZE, "csfk_file");
         if ('\0' == rvalue[0])
             fprintf(fp_csf_file, "\tFile = \"%s/crts/CSF1_1_sha256_2048_65537_v3_usr_crt.pem\"\n", g_sig_data_path);
-        else if (!strncmp (&rvalue[0], "pkcs11",6)) { /* PKCS11 Based Signing */
+        else if (is_pkcs11_value(rvalue)) {
             char *pkcs11_uri = build_pkcs11_uri(rvalue);
             if (pkcs11_uri != NULL) {
                 fprintf(fp_csf_file, "\tFile = %s\n", pkcs11_uri);
@@ -861,7 +773,7 @@ static int create_csf_file_v1(image_block_t *blocks, int idx, char *ofname)
         cfg_parser(fp_cfg, rvalue, RSIZE, "img_file");
         if ('\0' == rvalue[0])
             fprintf(fp_csf_file, "\tFile = \"%s/crts/IMG1_1_sha256_2048_65537_v3_usr_crt.pem\"\n", g_sig_data_path);
-        else if (!strncmp (&rvalue[0], "pkcs11",6)) { /* PKCS11 Based Signing */
+        else if (is_pkcs11_value(rvalue)) {
             char *pkcs11_uri = build_pkcs11_uri(rvalue);
             if (pkcs11_uri != NULL) {
                 fprintf(fp_csf_file, "\tFile = %s\n", pkcs11_uri);

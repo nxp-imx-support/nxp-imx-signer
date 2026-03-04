@@ -76,12 +76,16 @@ $ SIG_TOOL_PATH=<spsdk> SIG_DATA_PATH=<keys/crts folder> ./imx_signer -i flash.b
 ```
 
 ### PKCS#11 Support HAB
-For PKCS#11-based signing with Hardware Security Modules (HSMs), configure your CSF file using the **exact format**:
-```sh
-csfk_file=pkcs11:token=${PKCS-TOKEN};object=CSF1_1_sha256_2048_65537_v3_usr;type=cert;pin-value=${USR_PIN}
-img_file=pkcs11:token=${PKCS-TOKEN};object=IMG1_1_sha256_2048_65537_v3_usr;type=cert;pin-value=${USR_PIN}
+For PKCS#11-based signing with Hardware Security Modules (HSMs), is supported, by passing through the PKCS11 URIs:
 ```
-**_NOTE_**: Be sure the PKCS#11 support is enabled and Token and USR_PIN environmental variables are defined.
+csfk_file=pkcs11:token=<YourHSMToken>;object=<YourCSFCertObject>;type=cert;pin-source=file:/your/pin/file
+```
+Becomes:
+```
+File = "pkcs11:token=<YourHSMToken>;object=<YourCSFCertObject>;type=cert;pin-source=file:/your/pin/file"
+
+```
+**_NOTE_**: Be sure the PKCS#11 support is enabled in CST, prebuilt releases don't include it.
 
 ### PKCS#11 Support AHAB
 For SPSDK, please refer to [SPSDK PKCS11 Plugin](<https://github.com/nxp-mcuxpresso/spsdk_plugins/tree/main/pkcs11>) for installation details.
