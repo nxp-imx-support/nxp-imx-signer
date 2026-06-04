@@ -1510,7 +1510,12 @@ static int process_fdt_images(unsigned long off, uint8_t *infile_buf,
          * A max of 2 IVTs can be present in FIT: FDT IVT and CVE IVT.
          *
          */
-        g_ivt_search_step = g_images[g_last_img_idx].offset + g_images[g_last_img_idx].size - off;
+        /* In case of CVE IVT the g_images has only 1 image thus apply following logic only other
+         * scenarios/backward compatibility.
+         */
+        if (g_images[g_last_img_idx].offset && g_images[g_last_img_idx].size) {
+            g_ivt_search_step = g_images[g_last_img_idx].offset + g_images[g_last_img_idx].size - off;
+        }
         g_ivt_search_step = ALIGN(g_ivt_search_step, HAB_IVT_SEARCH_STEP);
         if (err) {
             if (err != -ERANGE && err != -EAGAIN) {
@@ -1542,7 +1547,6 @@ static int sign_hab_image(uint8_t *infile_buf, long int infile_size,
     bool found = false;
     int err = -E_FAILURE;
 
-    memset(g_images, 0, NUM_IMGS * sizeof(g_images[0]));
     /* Copy file to be signed */
     if(copy_files(ifname_full, ofname)) {
         fprintf(stderr, "ERROR: Failed to copy files: %s and %s\n", ifname_full, ofname);
@@ -1558,6 +1562,8 @@ static int sign_hab_image(uint8_t *infile_buf, long int infile_size,
 
         if (off < infile_size) {
             found = true;
+            /* Clear the g_images array before each time a new image array is built */
+            memset(g_images, 0, NUM_IMGS * sizeof(g_images[0]));
             if (!loop && !IS_FIT_IMAGE(infile_buf, off)) {/* first iteration */
                 err = process_ivt_image(off, infile_buf, loop, infile_size, ofname);
                 /* CSF was appended to the input image */
