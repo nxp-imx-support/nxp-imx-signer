@@ -396,10 +396,13 @@ int sign_csf(char *cfgname, char *ofname)
     if (g_debug) {
         strncpy(cst_extra_param, "--verbose", 10);
     }
-    /* Add -b pcks11 command*/
-    if(g_pkcs11_token) {
+
+    /* IS_PKCS11_CONF checks mandatory fields + at least one of id= or object=. */
+    if (IS_PKCS11_CONF(g_pkcs11_token))
+    {
         strncpy(cst_extra_param, "-b pkcs11", 10);
     }
+
     /* Find if tool exists and capture path */
     if (!find_cst_tool(&sys_cmd[0])) {
         if (0 > (snprintf(sys_cmd + strlen(sys_cmd), (SYS_CMD_LEN - strlen(sys_cmd)), " %s --i %s --o %s", cst_extra_param, cfgname, ofname))) {
@@ -495,37 +498,26 @@ err:
  */
 static char *extract_config_value(const char *rvalue)
 {
-    char *search_equal = strchr(rvalue, '=');
-    char *config_value = malloc(100);
     int skip = 0;
 
-    if (search_equal == NULL || config_value == NULL ) {
-        DEBUG("Search Token Error\n");
-        DEBUG("Memory allocation failed\n");
-        return NULL;
-    }
-
-    strncpy(&config_value[0],&search_equal[1],99);
-    config_value[99]='\0';
-    strtok(config_value, ";");
-    if (config_value == NULL) {
-        FREE(config_value);
-        return NULL;
-    }
-
-    char *source = &config_value[0];
-    if (*source == '$') {
+    if (*rvalue == '$') {
         skip++;
-        if (source[1] == '{') {
+        if (rvalue[1] == '{')
             skip++;
-        }
     }
-    strncpy(&config_value[0], source + skip,99);
-    config_value[99]='\0';
-    strtok(&config_value[0], "}");
 
-    return config_value;
+    if (skip > 0) {
+        char var[PKCS11_COMPONENT_MAX] = {0};
+        strncpy(var, rvalue + skip, PKCS11_COMPONENT_MAX - 1);
+        char *brace = strchr(var, '}');
+        if (brace) *brace = '\0';
+        const char *env = getenv(var);
+        return strdup(env ? env : var);
+    }
+
+    return strdup(rvalue);
 }
+
 /*
  * @brief       Detect and validate PKCS11 Config Param
  *
@@ -542,96 +534,219 @@ static int detect_pkcs11_config(const char *config_value) {
     if (strstr(config_value, "token="))
         flags |= TOKEN_EN;
     if (strstr(config_value, "object="))
-            flags |= OBJ_TYPE;
+        flags |= OBJ_TYPE;
     if (strstr(config_value, "type=cert"))
         flags |= TYPE_CERT;
-    if (strstr(config_value, "pin-value"))
+    if (strstr(config_value, "pin-value="))
         flags |= USRPIN;
+    if (strstr(config_value, "pin-source="))
+        flags |= PIN_SRC;
+    if (strstr(config_value, "id="))
+        flags |= ID_EN;
+
     return flags;
 }
 
 /*
  * @brief       Build PKCS11 URI string from configuration value
  *
+ *              Parses the rvalue string as a sequence of semicolon-separated
+ *              key=value components. Recognised components are
+ *              validated and assembled into the output URI.
+ *
+ *              Supported components:
+ *                token=        - token label
+ *                id=           - binary object ID, percent-encoded, passthrough
+ *                object=       - object label; value may be $VAR / ${VAR}
+ *                type=         - object type (type=cert required)
+ *                pin-value=    - inline PIN; value may be $VAR / ${VAR}
+ *                pin-source=   - PIN file path, passthrough to CST
+ *                serial=       - token serial number
+ *                manufacturer= - token manufacturer
  * @param[in]   rvalue : Configuration value string containing PKCS11 parameters
  *
- * @retval      pkcs11_uri : Complete PKCS11 URI string, or NULL on failure
- *                          Caller is responsible for freeing the returned string
+ * @retval      pkcs11_uri : Complete PKCS11 URI string (heap-allocated, caller frees),
+ *                           or NULL on failure / incomplete configuration
  */
 static char *build_pkcs11_uri(const char *rvalue) {
     ASSERT(rvalue, NULL);
 
-    char *pkcs11_uri = NULL;        /* PKCS11 URI string buffer */
-    char *env_result = NULL;        /* Env result for Token*/
-    char *config_object = NULL;     /* Configuration object identifier */
-    const char *pkcs11_token_pin = NULL;  /* Token or Pin values*/
+    char *pkcs11_uri     = NULL;
+    char *val_token      = NULL;  /* token= label */
+    char *val_id         = NULL;  /* id= percent-encoded binary, passthrough */
+    char *val_object     = NULL;  /* object= label */
+    char *val_pin        = NULL;  /* pin-value= resolved PIN */
+    char *val_pin_source = NULL;  /* pin-source= path, passthrough verbatim */
+    char *rvalue_copy    = NULL;
 
-    /* Allocate buffer for the complete PKCS11 URI */
-    pkcs11_uri = calloc(PKCS11_URI_BUFFER_SIZE+1, sizeof(char));
+    char extra[PKCS11_URI_BUFFER_SIZE] = {0};
+
+    /* Allocate output buffer */
+    pkcs11_uri = calloc(PKCS11_URI_BUFFER_SIZE + 1, sizeof(char));
     if (NULL == pkcs11_uri) {
         DEBUG("ERROR: Error allocating memory for PKCS11 URI\n");
         return NULL;
     }
 
-    /* Check if configuration is complete */
-    g_pkcs11_token = detect_pkcs11_config(rvalue); /* Set global flag*/
-    if ( g_pkcs11_token != COMPLETE_CONF) {
-        DEBUG("ERROR: Invalid PKCS11 configuration \n");
+    /* Validate mandatory fields */
+    DEBUG("build_pkcs11_uri: rvalue = '%s'\n", rvalue);
+    g_pkcs11_token = detect_pkcs11_config(rvalue);
+    DEBUG("build_pkcs11_uri: detected Configuration flags = 0x%x\n",g_pkcs11_token);
+
+    if (!IS_PKCS11_CONF(g_pkcs11_token)) {
+        fprintf(stderr,"ERROR: Invalid PKCS11 configuration. "
+            "Required: pkcs11 prefix, type=cert, token=, "
+            "pin-value= or pin-source=, and at least one of id= or object=\n");
+        goto err;
+    }
+    
+    /* Parse semicolon-separated key=value components */
+    rvalue_copy = strdup(rvalue);
+    if (!rvalue_copy)
+        goto err;
+
+    char *parse_start = rvalue_copy;
+    char *scheme_end = strstr(rvalue_copy, "pkcs11:");
+    if (scheme_end)
+        parse_start = scheme_end + strlen("pkcs11:");
+
+    char key[PKCS11_COMPONENT_MAX];
+    char val[PKCS11_COMPONENT_MAX];
+    char *saveptr = NULL;
+    char *token = strtok_r(parse_start, ";", &saveptr);
+
+    while (token != NULL) {
+        const char *eq = strchr(token, '=');
+        if (!eq) {
+            token = strtok_r(NULL, ";", &saveptr);
+            continue;
+        }
+
+        size_t key_len = (size_t)(eq - token);
+        if (key_len >= PKCS11_COMPONENT_MAX || strlen(eq + 1) >= PKCS11_COMPONENT_MAX) {
+            token = strtok_r(NULL, ";", &saveptr);
+            continue;
+        }
+        strncpy(key, token, key_len);
+        key[key_len] = '\0';
+        strncpy(val, eq + 1, PKCS11_COMPONENT_MAX - 1);
+        val[PKCS11_COMPONENT_MAX - 1] = '\0';
+
+        if (strncmp(key, "token",5) == 0) {
+            val_token = extract_config_value(val);
+
+        } else if (strncmp(key, "id",2) == 0) {
+            /* percent-encoded binary — passthrough verbatim, no env resolution */
+            val_id = strdup(val);
+
+        } else if (strncmp(key, "object",6) == 0) {
+            val_object = extract_config_value(val);
+
+        } else if (strncmp(key, "pin-value",9) == 0) {
+            /* Only use pin-value= if pin-source= has not already been parsed */
+            if (!val_pin_source)
+                val_pin = extract_config_value(val);
+
+        } else if (strncmp(key, "pin-source",10) == 0) {
+            /* Passed through verbatim — CST handles file reading natively.
+                * Takes precedence over pin-value= if both are present. */
+            FREE(val_pin_source);
+            val_pin_source = strdup(val);
+
+        } else if (strncmp(key, "type",4) == 0) {
+            /*type= branch kept to consume token,
+            value already validated by IS_PKCS11_CONF()*/
+
+        } else if (strncmp(key, "serial",6) == 0) {
+            /* serial= token serial number, passthrough verbatim */
+            strncat(extra, ";serial=", sizeof(extra) - strlen(extra) - 1);
+            strncat(extra, val,        sizeof(extra) - strlen(extra) - 1);
+
+        } else if (strncmp(key, "manufacturer",12) == 0) {
+            /* manufacturer= token manufacturer, passthrough verbatim */
+            strncat(extra, ";manufacturer=", sizeof(extra) - strlen(extra) - 1);
+            strncat(extra, val,              sizeof(extra) - strlen(extra) - 1);
+
+        } else if (strncmp(key, "model",5) == 0) {
+            /* model= token model, passthrough verbatim */
+            strncat(extra, ";model=", sizeof(extra) - strlen(extra) - 1);
+            strncat(extra, val,       sizeof(extra) - strlen(extra) - 1);
+
+        } else if (strncmp(key, "library-", 8) == 0 ||
+                strncmp(key, "slot-",    5) == 0 ||
+                strncmp(key, "module-",  7) == 0 ) {
+                fprintf(stderr, "ERROR: '%s=' is not supported by the libp11 URI parser "
+                "(RFC 7512 attribute not implemented in libp11)\n", key);
+                goto err;
+
+        } else {
+            fprintf(stderr, "ERROR: '%s=%s' is not a supported PKCS#11 URI attribute\n", key,val);
+            goto err;
+        }
+        token = strtok_r(NULL, ";", &saveptr);
+    }
+
+    /* Verify mandatory components were extracted */
+    if (!val_token) {
+        DEBUG("ERROR: PKCS11 URI must contain token=\n");
+        goto err;
+    }
+    if (!val_id && !val_object) {
+        DEBUG("ERROR: PKCS11 URI must contain at least one of id= or object=\n");
+        goto err;
+    }
+    if (!val_pin && !val_pin_source) {
+        DEBUG("ERROR: PKCS11 URI must contain pin-value= or pin-source=\n");
         goto err;
     }
 
-    /* Start building the PKCS11 URI */
-    strncpy(pkcs11_uri, "\"pkcs11:token=", 15);
-
-    /* Extract and process token configuration */
-    env_result = extract_config_value(rvalue);
-    if (env_result != NULL) {
-        pkcs11_token_pin = getenv(env_result);
-        if (pkcs11_token_pin != NULL) {
-            DEBUG("Token env variable PKCS11_Token: %s\n", pkcs11_token_pin);
-            strncat(pkcs11_uri, pkcs11_token_pin, PKCS11_URI_BUFFER_SIZE - strlen(pkcs11_uri));
-        } else
-            strncat(pkcs11_uri, env_result, PKCS11_URI_BUFFER_SIZE - strlen(pkcs11_uri));
-    } else
-        goto err;
-
-    /* Extract and add object configuration */
-    config_object = extract_config_value(strchr(rvalue, ';'));
-    if (config_object != NULL) {
+    /* ------------------------------------------------------------------ *
+     * Assemble output URI:
+     * ------------------------------------------------------------------ */
+    strncpy(pkcs11_uri, "\"pkcs11:", PKCS11_URI_BUFFER_SIZE);
+    strncat(pkcs11_uri, "token=",    PKCS11_URI_BUFFER_SIZE - strlen(pkcs11_uri));
+    strncat(pkcs11_uri, val_token,   PKCS11_URI_BUFFER_SIZE - strlen(pkcs11_uri));
+    if (val_id) {
+        strncat(pkcs11_uri, ";id=", PKCS11_URI_BUFFER_SIZE - strlen(pkcs11_uri));
+        strncat(pkcs11_uri, val_id, PKCS11_URI_BUFFER_SIZE - strlen(pkcs11_uri));
+    }
+    if (val_object) {
         strncat(pkcs11_uri, ";object=", PKCS11_URI_BUFFER_SIZE - strlen(pkcs11_uri));
-        strncat(pkcs11_uri, config_object, PKCS11_URI_BUFFER_SIZE - strlen(pkcs11_uri));
-    } else
-        goto err;
+        strncat(pkcs11_uri, val_object, PKCS11_URI_BUFFER_SIZE - strlen(pkcs11_uri));
+    }
 
-    pkcs11_token_pin = NULL;
-    FREE(env_result);
-
-    /* Add type=cert */
     strncat(pkcs11_uri, ";type=cert", PKCS11_URI_BUFFER_SIZE - strlen(pkcs11_uri));
 
-    /* Extract and add PIN configuration */
-    env_result = extract_config_value(strrchr(rvalue, ';'));
-    if (env_result != NULL) {
-        pkcs11_token_pin = getenv(env_result);
-        DEBUG("USR_PIN environment variable %s and %s\n", env_result, pkcs11_token_pin);
-        strncat(pkcs11_uri, ";pin-value=", PKCS11_URI_BUFFER_SIZE - strlen(pkcs11_uri));
-        if (pkcs11_token_pin != NULL)
-            strncat(pkcs11_uri, pkcs11_token_pin, PKCS11_URI_BUFFER_SIZE - strlen(pkcs11_uri));
-        else
-            strncat(pkcs11_uri, env_result, PKCS11_URI_BUFFER_SIZE - strlen(pkcs11_uri));
-    } else
-        goto err;
+    /* Append passthrough components (serial=, manufacturer=, etc.) */
+    if (strlen(extra) > 0)
+        strncat(pkcs11_uri, extra, PKCS11_URI_BUFFER_SIZE - strlen(pkcs11_uri));
 
-    /* Close the URI string */
+    /* PIN — pin-source= takes precedence over pin-value= */
+    if (val_pin_source) {
+        strncat(pkcs11_uri, ";pin-source=", PKCS11_URI_BUFFER_SIZE - strlen(pkcs11_uri));
+        strncat(pkcs11_uri, val_pin_source, PKCS11_URI_BUFFER_SIZE - strlen(pkcs11_uri));
+    } else {
+        strncat(pkcs11_uri, ";pin-value=", PKCS11_URI_BUFFER_SIZE - strlen(pkcs11_uri));
+        strncat(pkcs11_uri, val_pin,       PKCS11_URI_BUFFER_SIZE - strlen(pkcs11_uri));
+    }
+
     strncat(pkcs11_uri, "\"", PKCS11_URI_BUFFER_SIZE - strlen(pkcs11_uri));
 
-    FREE(config_object);
-    FREE(env_result);
+    FREE(val_token);
+    FREE(val_id);
+    FREE(val_object);
+    FREE(val_pin);
+    FREE(val_pin_source);
+    FREE(rvalue_copy);
     return pkcs11_uri;
 
 err:
-    FREE(config_object);
-    FREE(env_result);
+    FREE(rvalue_copy);
+    FREE(val_token);
+    FREE(val_id);
+    FREE(val_object);
+    FREE(val_pin);
+    FREE(val_pin_source);
     FREE(pkcs11_uri);
     return NULL;
 }
