@@ -103,12 +103,38 @@ typedef enum SOC_TYPE {
 
 typedef enum PKCS_TOKEN {
     PCKS11_ENV = 1,
-    TOKEN_EN = 2,
-    OBJ_TYPE = 4,
-    TYPE_CERT = 8,
-    USRPIN = 16,
-    COMPLETE_CONF = 31,
+    TOKEN_EN   = 2,   /* token= label */
+    OBJ_TYPE   = 4,   /* object= label (optional if id= is present) */
+    TYPE_CERT  = 8,
+    USRPIN     = 16,  /* pin-value= inline PIN */
+    ID_EN      = 32,  /* id= binary object ID, percent-encoded */
+    PIN_SRC    = 64,  /* pin-source= PIN from file */
+    COMPLETE_CONF = (PCKS11_ENV | TYPE_CERT),  /* = 9 */
 } pkcs11token_type_t;
+
+/* HAS_PIN — true when at least one PIN method is present */
+#define HAS_PIN(flags)      ((flags) & (USRPIN | PIN_SRC))
+
+/* HAS_OBJ_ID — true when id= or object= is present */
+#define HAS_OBJ_ID(flags)   ((flags) & (ID_EN | OBJ_TYPE))
+
+/*
+ * IS_PKCS11_CONF — full validation:
+ *   - mandatory fields (pkcs11 prefix + type=cert)
+ *   - at least one PIN method: pin-value= or pin-source=
+ *   - at least one object identifier: id= or object=
+ */
+#define IS_PKCS11_CONF(flags) \
+    (((flags) & COMPLETE_CONF) == COMPLETE_CONF && \
+     ((flags) & TOKEN_EN) && \
+     HAS_PIN(flags) && \
+     HAS_OBJ_ID(flags))
+
+/* Maximum length of a single PKCS#11 URI component value (percent-encoded) */
+#define PKCS11_COMPONENT_MAX 256
+
+/* Maximum PIN length when read from pin-source= file */
+#define PKCS11_PIN_MAX 64
 
 #define E_OK 0
 #define E_FAILURE 1
